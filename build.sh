@@ -10,6 +10,10 @@ cd "$(dirname "$0")"
 export JIELI_TOOLCHAIN="${JIELI_TOOLCHAIN:-$HOME/.jieli/toolchain}"
 export AC79_SDK="${AC79_SDK:-$HOME/fw-AC79_AIoT_SDK}"
 PY="${PYTHON:-python3}"
+# macOS: let a python.org Python find Homebrew's FriBiDi (Pillow's raqm, for the fonts)
+if [ "$(uname)" = Darwin ] && [ -d /opt/homebrew/lib ]; then
+    export DYLD_FALLBACK_LIBRARY_PATH="${DYLD_FALLBACK_LIBRARY_PATH:-$HOME/lib:/usr/local/lib:/usr/lib}:/opt/homebrew/lib"
+fi
 [ -f base/tools/build.py ] || { echo "build.sh: no fm1-base in base/ (git submodule update --init --recursive)"; exit 1; }
 "$PY" -c 'import PIL' 2>/dev/null || { echo "build.sh: $PY has no Pillow (pip3 install Pillow)"; exit 1; }
 exec "$PY" base/tools/build.py app "$@"

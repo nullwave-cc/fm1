@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logotype-dark.svg">
+    <img src="assets/logotype-light.svg" width="420" alt="nullwave">
+  </picture>
+</p>
+
 # nullwave for the FM-1
 
 A groovebox firmware for the M-VAVE FM-1, with six equal channels. Any channel can be a synth, a drum kit, a
