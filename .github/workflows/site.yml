@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: MPL-2.0
+# The install site on GitHub Pages: the web installer, the browser emulator and the manual, from a release build
+# (base/tools/make_site.py). Runs on a version tag, or by hand with a version. Pages must be set to deploy from
+# GitHub Actions in the repository's settings.
+name: Site
+
+on:
+  push:
+    tags: ['v[0-9]*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version, X.Y[.Z][-suffix] (e.g. 0.1-alpha)"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          v="${INPUT_VERSION:-${GITHUB_REF_NAME#v}}"
+          printf '%s' "$v" | grep -Eq '^[0-9]{1,2}\.[0-9]{1,2}(\.[0-9]{1,2})?(-[A-Za-z0-9]+)?$'
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+      - name: Python with Pillow and FriBiDi
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libfribidi0
+          python3 -m pip install --user Pillow
+      - uses: actions/cache@v4
+        with:
+          path: base/.toolchain/downloads
+          key: jieli-${{ runner.os }}-${{ hashFiles('base/tools/toolchain.lock') }}
+      - name: Pinned JieLi toolchain and SDK files
+        run: ./build.sh --setup
+      - name: Emscripten 6.0.10
+        run: |
+          set -eu
+          git clone -q https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          git -C "$RUNNER_TEMP/emsdk" checkout -q a2b92777574c2feda07994cd4f1079a3dfc151f8
+          "$RUNNER_TEMP/emsdk/emsdk" install 6.0.10
+          "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.10
+      - name: Package, emulator and site
+        run: |
+          set -eu
+          set +u; . "$RUNNER_TEMP/emsdk/emsdk_env.sh"; set -u
+          ./build.sh --release "$VERSION"
+          ./build.sh --web --release "$VERSION"
+          python3 base/tools/make_site.py app "app/build/nullwave-$VERSION.fwsc" "$VERSION" _site
+          # the installer lives at /fm1/installer
+          mv _site/install _site/installer
+          sed -i 's#"install/"#"installer/"#g' _site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

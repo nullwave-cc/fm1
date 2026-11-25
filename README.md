@@ -38,8 +38,13 @@ sampler or a MIDI output, and all six share one pool of voices, so there is no f
     git clone --recursive https://github.com/nullwave-cc/fm1
     ./build.sh --host               # the host simulator, no toolchain needed
     sh tests/run_tests.sh           # host tests
-    ./build.sh                      # the FM-1 package (JieLi toolchain and AC79 SDK, see base/README.md)
+    ./build.sh --setup              # once: the pinned JieLi toolchain and SDK files
+    ./build.sh                      # the FM-1 package: app/build/nullwave.fwsc
     ./build.sh --web                # the browser emulator
+
+## Install
+
+See [docs/INSTALL.md](docs/INSTALL.md). Back up the FM-1 first.
 
 ## Licence
 

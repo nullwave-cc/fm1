@@ -8,6 +8,8 @@ o2 = []                        # separate units compiled at -O2 (an app's DSP)
 words = "words.tsv"
 ble = true                     # Bluetooth MIDI (--no-ble builds without it)
 ble_central = true             # and the FM-1 connects to Bluetooth MIDI devices too
+ble_stack = "own"              # fm1-base's open Bluetooth stack (bt/): no JieLi radio library
+ble_pairing = true             # pairing and an encrypted link, the bond kept
 companion = true               # the companion services: the saved settings as a file for a page (app.h APP_FILE_OBJS)
 # the site (tools/make_site.py, tools/publish_site.sh)
 tagline = "a six-channel groovebox for the FM-1"
@@ -18,6 +20,6 @@ credits = "Built on fm1-base and felucca-bsp, with engines from Felucca-Engines.
 author = "nullwave"      # who made it
 description = "Six equal channels, each a synth, a drum kit, a sampler or MIDI out, sharing one voice pool, with a step sequencer and scales on the keys."
 tags = ["groovebox", "synth", "sequencer", "drum-machine", "sampler"]    # from the list in docs/FIRMWARE-JSON.md; the build refuses another
-install = "https://nullwave.cc/fm1/install/"   # the page that installs it
+install = "https://nullwave.cc/fm1/installer/"   # the page that installs it
 site = "https://nullwave.cc/fm1/"
 screenshot = "app/docs/img/screen-playing.png"   # for the hubs' cards: a square PNG, at least 240 x 240, in your repository

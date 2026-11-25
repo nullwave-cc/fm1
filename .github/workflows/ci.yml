@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
-# Host build and tests on pull requests and on pushes to main.
+# Host tests and the FM-1 package on pull requests and on pushes to main.
 name: CI
 
 on:
@@ -28,3 +28,32 @@ jobs:
           python3 -m pip install --user Pillow
       - name: Host simulator tests
         run: sh tests/run_tests.sh
+
+  device:
+    # The FM-1 package, with the pinned JieLi toolchain and SDK files (base/tools/toolchain.lock).
+    # Bluetooth runs on fm1-base's own stack, so no other SDK parts are needed.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Python with Pillow and FriBiDi
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libfribidi0
+          python3 -m pip install --user Pillow
+      - uses: actions/cache@v4
+        with:
+          path: base/.toolchain/downloads
+          key: jieli-${{ runner.os }}-${{ hashFiles('base/tools/toolchain.lock') }}
+      - name: Pinned JieLi toolchain and SDK files
+        run: ./build.sh --setup
+      - name: Build the package
+        run: ./build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nullwave-${{ github.sha }}
+          path: |
+            app/build/nullwave.fwsc
+            app/build/firmware.json
+          if-no-files-found: error

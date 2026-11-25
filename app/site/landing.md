@@ -7,7 +7,7 @@ This is version {{VERSION}}, an early build. You install it at your own risk, an
 own firmware back.
 
 - [Try it in the browser](emu/).
-- [Install](install/) it from Chrome or Edge, with the FM-1 connected by USB.
+- [Install](installer/) it from Chrome or Edge, with the FM-1 connected by USB.
 - The [Manual](manual/).
 - [Download {{PKG}}](firmware/{{PKG}}) for the command-line installer: `python3 tools/fm1_install.py {{PKG}}`.
 - The [Source](https://github.com/nullwave-cc/fm1) is under MPL-2.0. It's built on fm1-base and felucca-bsp, which
