@@ -60,6 +60,11 @@ jobs:
           tar -czf "dist/nullwave-fm1-site-$VERSION.tar.gz" -C _site .
           tar -czf "dist/nullwave-fm1-screens-$VERSION.tar.gz" -C docs/img/promo .
           cp "app/build/nullwave-$VERSION.fwsc" dist/
+      - name: No private paths in what is published
+        run: |
+          set -eu
+          python3 tools/publish_site.py --check _site
+          python3 tools/publish_site.py --check dist
       - name: Release notes (CHANGELOG.md, this version's entry)
         run: |
           set -eu

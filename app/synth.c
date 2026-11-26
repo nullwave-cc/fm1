@@ -1318,11 +1318,9 @@ int32_t synth_mod_now(uint32_t ch, uint32_t dst) { return dst < MT_N ? modq[ch %
 #include <time.h>
 #include <stdio.h>
 static uint64_t prof_ns[8];
-static uint64_t prof_now(void)
+static uint64_t prof_now(void)           /* (ISO C's clock(): the render's own unit has no POSIX clocks on Linux) */
 {
-    struct timespec q;
-    clock_gettime(CLOCK_MONOTONIC, &q);
-    return (uint64_t)q.tv_sec * 1000000000u + (uint64_t)q.tv_nsec;
+    return (uint64_t)clock() * (1000000000u / CLOCKS_PER_SEC);
 }
 #define PROF_T(v) uint64_t v = prof_now()
 #define PROF_ADD(i, v) (prof_ns[i] += prof_now() - (v))
