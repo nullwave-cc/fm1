@@ -65,6 +65,9 @@ def main():
             for n in ("fm1-docs.css", "fm1-docs.js"):
                 shutil.copyfile(BUILT / "assets" / n, dst / n)
         if page == "emulator":
+            for d in ("guide", "assets", "o2", "web"):   # (the retired guide, vendored copies, a build's object,
+                if (dst / d).exists():                    # an empty folder: none of them loaded by the emulator)
+                    shutil.rmtree(dst / d)
             for d in ("fonts", "words"):
                 if (BUILT / d).exists():
                     shutil.copytree(BUILT / d, dst / d, dirs_exist_ok=True)
@@ -80,6 +83,8 @@ def main():
                     shutil.copyfile(BUILT / "firmware" / fw, dst / "firmware" / fw)
                     html = html.replace("../firmware/" + fw, "firmware/" + fw)
             (dst / "index.html").write_text(html, encoding="utf-8")
+            for lic in (BUILT / "firmware").glob("*.txt"):   # (the packages' licences beside them: m-bootloader's MIT,
+                shutil.copyfile(lic, dst / "firmware" / lic.name)   # the SDK's and the own stack's parts)
     names = sorted({n.strip() for s in screens for n in s.split(",") if n.strip() and not n.startswith("@")})
     print(f"publish_site: {', '.join(PAGES)} at {dest} ({version}{', the package from ' + fw_url if fw_url else ''})")
     print("publish_site: the site's /assets/screens/ needs: " + " ".join(names))
