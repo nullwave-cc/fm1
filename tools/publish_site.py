@@ -15,8 +15,11 @@ companion's scripts and the firmware it installs, the emulator its fonts and wor
 docs' own script and style. --fw-url: the installer loads nullwave's package from there (a release's asset) instead of
 its own copy. The screens the pages show are the site's /assets/screens/ (docs/img/promo's, by name): the list of
 the ones it needs is printed, to check against the site. Nothing is written outside OUT/fm1/<the four>."""
+import hashlib
+import os
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -112,6 +115,31 @@ def rewrite(html, page):
     return html
 
 
+EMU = ROOT / "app" / "build" / "emu"
+EMU_RUN = ("app.js", "app.wasm", "app_worklet.js", "worklet.js", "parts", "reader")   # (what the page loads)
+
+
+def emulator_fresh(version):
+    """the emulator built now from this tree (./build.sh --web --release VERSION), and its version checked: a page
+    never ships an older build than the package beside it"""
+    env = dict(os.environ, DYLD_FALLBACK_LIBRARY_PATH="/opt/homebrew/lib")
+    r = subprocess.run(["./build.sh", "--web", "--release", version], cwd=ROOT, env=env, capture_output=True, text=True)
+    if r.returncode:
+        sys.exit("publish_site: the emulator's build failed:\n" + r.stdout[-2000:] + r.stderr[-2000:])
+    wasm = (EMU / "app.wasm").read_bytes()
+    if not re.search(rb"nullwave " + re.escape(version.encode()) + rb"(?![-.\w])", wasm):
+        found = re.findall(rb"nullwave [0-9][-.\w]*", wasm)
+        sys.exit(f"publish_site: the emulator says {found[:1]}, not nullwave {version}")
+
+
+def busted(text, version, names):
+    """each of names loaded with ?v=VERSION: a host's cache never serves an older copy after an update"""
+    for n in names:
+        text = re.sub(r'(["\'`])(' + re.escape(n) + r')\1', lambda m: f"{m.group(1)}{m.group(2)}?v={version}{m.group(1)}",
+                      text)
+    return text
+
+
 def main():
     if len(sys.argv) == 3 and sys.argv[1] == "--check":   # (the release workflow: a folder of built files, no leaks)
         bad = leaks(Path(sys.argv[2]))
@@ -124,6 +152,7 @@ def main():
     pkg = f"nullwave-{version}.fwsc"
     if not (BUILT / "firmware" / pkg).exists():
         sys.exit(f"publish_site: {BUILT / 'firmware' / pkg} is not there: build the release and the site first")
+    emulator_fresh(version)
     dest = out / "fm1"
     screens = set()
     for page in PAGES:
@@ -137,9 +166,35 @@ def main():
             screens.update(m for s in re.findall(r'&quot;screen&quot;: &quot;([^&]*)&quot;', html) for m in [s])
             f.write_text(html, encoding="utf-8")
         if page in ("manual", "quick-start"):
+            for f in dst.rglob("*.html"):        # (their pictures and the docs' files: ?v=VERSION)
+                h = f.read_text(encoding="utf-8")
+                h = re.sub(r'(?<=["\s,])((?:img/|\./img/)[^\s",?]+)', lambda m: m.group(1) + "?v=" + version, h)
+                h = busted(h, version, ("fm1-docs.css", "fm1-docs.js"))
+                f.write_text(h, encoding="utf-8")
             for n in ("fm1-docs.css", "fm1-docs.js"):
                 shutil.copyfile(BUILT / "assets" / n, dst / n)
         if page == "emulator":
+            for n in EMU_RUN:                # (this tree's build, not the site build's copy)
+                (shutil.rmtree if (dst / n).is_dir() else lambda x: x.unlink(missing_ok=True))(dst / n)
+                (shutil.copytree if (EMU / n).is_dir() else shutil.copyfile)(EMU / n, dst / n)
+            idx = dst / "index.html"
+            tok = version + "-" + hashlib.sha256((EMU / "app.wasm").read_bytes()).hexdigest()[:8]   # (by content too)
+            h = idx.read_text(encoding="utf-8")   # (a visitor's saved FM-1 from an older version: forgotten, as a fresh
+            reset = ('<script>try{if(localStorage.getItem("nullwave-emu-version")!=="' + version + '"){'   # install)
+                     'localStorage.removeItem("nullwave-emu-store");localStorage.setItem("nullwave-emu-version","'
+                     + version + '")}}catch(e){}</script>')
+            if "nullwave-emu-version" not in h:
+                h = re.sub(r"(<head[^>]*>)", r"\1" + reset.replace("\\", "\\\\"), h, count=1)
+            idx.write_text(h, encoding="utf-8")
+            idx.write_text(busted(idx.read_text(encoding="utf-8"), tok,
+                                  ("app.wasm", "app_worklet.js", "worklet.js", "./app.js", "./reader/words.js",
+                                   "./reader/tts.js")), encoding="utf-8")
+            for f, names in ((dst / "app.js", ("./parts/parts.js", "./parts/midi.js", "./parts/port.js")),
+                             (dst / "parts" / "port.js", ("./midi.js",)),
+                             (dst / "reader" / "tts.js", ("tts_worker.js",)),
+                             (dst / "reader" / "tts_worker.js", ("espeak.js",))):
+                if f.exists():
+                    f.write_text(busted(f.read_text(encoding="utf-8"), tok, names), encoding="utf-8")
             for d in ("guide", "assets", "o2", "web"):   # (the retired guide, vendored copies, a build's object,
                 if (dst / d).exists():                    # an empty folder: none of them loaded by the emulator)
                     shutil.rmtree(dst / d)
@@ -160,6 +215,9 @@ def main():
                 elif (BUILT / "firmware" / fw).exists():
                     shutil.copyfile(BUILT / "firmware" / fw, dst / "firmware" / fw)
                     html = html.replace("../firmware/" + fw, "firmware/" + fw)
+            sha = hashlib.sha256((dst / "firmware" / pkg).read_bytes()).hexdigest()[:12] if not fw_url else ""
+            if sha:                              # (the package by its content: an update of the same version reloads)
+                html = html.replace("firmware/" + pkg, f"firmware/{pkg}?v={sha}")
             (dst / "index.html").write_text(html, encoding="utf-8")
             for lic in (BUILT / "firmware").glob("*.txt"):   # (the packages' licences beside them: m-bootloader's MIT,
                 shutil.copyfile(lic, dst / "firmware" / lic.name)   # the SDK's and the own stack's parts)
