@@ -1,0 +1,61 @@
+# Drones. HOLD (SHIFT + PLAY): each key latches its note, a latched one tapped again ends, HOLD off ends them all.
+# Recorded: a note held over the whole loop is kept as a DRONE, on without a break (not struck again each loop),
+# till the transport stops; struck again when it plays from the start. Run by tests/run_tests.sh:
+#   app/build/host/nullwave_host app/tests/drone.txt app/build/host
+wait 1800
+turn ALGO 1
+wait 100
+# HOLD on: three notes stacked hands-free
+press OCT-
+wait 30
+tap PLAY
+wait 30
+release OCT-
+wait 30
+expect hold 1
+expect playing 0
+tapkey 7 100
+tapkey 11 100
+tapkey 14 100
+wait 300
+expect gated 3
+# the middle one tapped again: it ends
+tapkey 11 100
+wait 100
+expect gated 2
+# HOLD off: all end
+press OCT-
+wait 30
+tap PLAY
+wait 30
+release OCT-
+wait 100
+expect hold 0
+expect gated 0
+# recorded: a note held over the whole bar (the pattern is a bar) is a drone
+tap PLAY
+wait 100
+tap REC
+wait 50
+key 7 down 100
+wait 2600
+key 7 up
+wait 50
+expect drones 1
+expect gated 1
+tap REC
+wait 4200
+expect gated 1
+expect voices 1
+expect drones 1
+# stopped: it ends; played again: struck at its place, on again
+tap PLAY
+wait 200
+expect drones 0
+expect gated 0
+tap PLAY
+wait 2200
+expect drones 1
+expect gated 1
+tap PLAY
+wait 100

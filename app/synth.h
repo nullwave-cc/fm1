@@ -152,6 +152,8 @@ int synth_audible(uint32_t ch);
 void synth_shed(void);
 void synth_load(uint32_t p);             /* the render's load, x16 permille: the voices' budget follows it */
 uint32_t synth_budget(void);
+void synth_budget_reset(void);
+void synth_protect(uint32_t ch, uint32_t note, int on);   /* a note held on purpose (a drone, HOLD): shed last */
 uint32_t synth_budget_used(void);
 uint32_t synth_budget_sheds(void);
 uint32_t synth_quiet_pct(void);          /* the render's silent blocks since the last call, % (nothing rendered) */                  /* the render near its time: the oldest voice let go fast */

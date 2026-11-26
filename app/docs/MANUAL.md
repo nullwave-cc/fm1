@@ -98,7 +98,7 @@ python3 base/tools/fm1_install.py nullwave.fwsc
 | **SAVE** | The SONG page; on it, saves (tap twice). SELECT: PRESETS, USER, SONG, SCENE, CHAIN, TOOLS | Scene layer: keys 1–16 launch scenes; more keys in one hold chain them; F# copy; G# loop / song; A# song recording | **◆** NAME: the selected channel's name | — |
 | **ARP** | ARP, ARP 2 | Roll layer: held keys repeat at ROLL; OCT− held: ghost, OCT+: hard; K1 ROLL | **◆** graph (the note order over the octaves) | — |
 | **SEQ** | PATTERN, then NOTES (a synth) or DRUMS (a kit) | Step layer: keys are the 16 steps of a bar (a page of 16 steps); SELECT picks the bar (`STEPS BAR 2/4`, the top bar lights it; DRUMS follows it). K1 note, K2 DIV, K3 swing, K4 bars. Hold a step: K1 NOTE, K2 VEL, K3 RATCH (ratchet ×1–×4), K4 NUDGE; ALGORITHM picks a parameter to lock, PRESETS sets it | — | SEQ + SELECT or OCT−/OCT+: the bar. Held step + OCT−: clear its extras; + OCT+: fill condition (ALWAYS, FILL ONLY, NO FILL). On a kit, SEQ + black key: the lane to place |
-| **PLAY** | Play / stop (song mode: the chain) | — | — | — |
+| **PLAY** | Play / stop (song mode: the chain) | — | **◆** HOLD: the keys latch their notes (tap one again: it ends); again: off | — |
 | **REC** | Playing: record on the selected channel (tap again to stop). Stopped: arm (REC page) | 2 s: clear the channel's pattern (recording, armed or not) | **◆** REC MODE: OVERDUB ↔ REPLACE | EDIT + REC: clear the channel at once |
 | **OCT−** / **OCT+** | Octave down / up on release, if nothing else was pressed. Both: octave 0 | SHIFT | — | — |
 
@@ -120,6 +120,7 @@ LOAD, SAVE, NEW, CLRSQ, INIT and user preset ERASE ask once (`AGAIN: …`); a se
 | SHIFT + SEL | the scale graph on or off |
 | SHIFT + REC | REC MODE: OVERDUB ↔ REPLACE |
 | SHIFT + HOME | **◆** MAIN as PLAY ↔ LOOP |
+| SHIFT + PLAY | **◆** HOLD on the channel: each key latches its note, tapped again it ends; again: HOLD off, all end |
 | SHIFT + SAVE | **◆** NAME: the selected channel's name (SAVE again keeps it, HOME leaves it as it was) |
 | OCT− + OCT+ | octave 0 |
 
@@ -173,7 +174,8 @@ LANES and LANES 2 (each lane's level). Then VOICE (VCE POLY / MONO / LEG / UNI, 
 it, TRANSP, GLD).
 
 **ARP:** ARP (MODE: OFF, UP, DN, UPDN, RND, ORD, REPEAT, DNUP, UP+8, CONV, DIVG, PINKY, THUMB, WALK, CHORD; RATE 1/4 …
-1/32; OCT 1–4; GATE); ARP 2 (SWG, PROB, HOLD, ORD NOTE / PLAY). HOLD with MODE OFF latches the keys.
+1/32; OCT 1–4; GATE); ARP 2 (SWG, PROB, HOLD, ORD NOTE / PLAY). HOLD with MODE OFF latches the keys: each key's
+note stays on, tapped again it ends, HOLD off ends them all (SHIFT + PLAY does the same).
 
 **SEQ:** PATTERN (BARS 1–8; DIV 1/32, 1/16T, 1/16, 1/8T, 1/8, 1/4, 1/2, 1 BAR, 2 BAR; SWING; PATTERN 1–16).
 NOTES on a synth (NOTE# the note picked, PITCH, MOVE by a step, LENGTH). DRUMS on a kit (LANE, STEP, HIT, VEL).
@@ -189,7 +191,8 @@ NOTES on a synth (NOTE# the note picked, PITCH, MOVE by a step, LENGTH). DRUMS o
 | TEXTURE 2 | RATE (1–16 bars) | WHEN PLAY / ALWAYS | DUCK | |
 
 **SAVE:** PRESETS (SOUND, ENGINE, FAV); USER (SLOT 1–32, LOAD, ERASE, SAVE); SONG (SONG A–H, LOAD, SAVE, NEW); SCENE
-(SCENE, CHANNEL, PATTERN, SOUND); CHAIN (STEP, SCENE, BARS, REPEAT); TOOLS (CLRSQ, INIT, NEW).
+(SCENE, CHANNEL, PATTERN, SOUND); **◆** CHAIN (STEP, SCENE, BARS, REPEAT; the keys type the song's order, see Scenes and
+songs); TOOLS (CLRSQ, INIT, NEW).
 
 **REC** (armed): MODE FREE / TEMPO, BARS 1 / 2 / 4 / 8, START NOTE / COUNT, QUANT.
 
@@ -287,7 +290,8 @@ white key's note below it, so every key sounds in key).
 
 With a CHORD set, the white keys walk the scale from C4 and play its chord on each degree; the black keys change the
 chord while held (**CHORD+**): F# major ↔ minor, G# add the 7th, A# sus4, C# add the 9th, D# an inversion. STRUM plays a
-chord's notes apart (+ low to high, − high to low). VLEAD keeps each chord near the last. SEL held: any key sets the
+chord's notes apart (+ low to high, − high to low). VLEAD keeps each chord near the last. Changing CHORD, KEYS, the
+scale, the root, TRANS or the octave ends the notes the keys hold, so nothing is left on: press the keys again. SEL held: any key sets the
 root, KNOB 1–4 CHORD, SCALE, KEYS, TRANSPOSE. In PLAY the chord, the notes sounding and the key are named under the wave.
 
 ## Punch-in effects (FX held)
@@ -327,6 +331,11 @@ They last while held, and several stack.
 - **Steps:** hold SEQ. **Locks:** hold a step, ALGORITHM picks the parameter, PRESETS sets it.
 - **Fills:** GLO + E4 (while held) or C4 (the next bar). Steps marked FILL ONLY play only then, NO FILL never then.
 - **NOTES, DRUMS:** SEQ's second page, see Pages.
+- **◆ Drones:** a note held down for the whole loop while recording (or latched with HOLD) is kept as a DRONE: it
+  sounds on without a break, never struck again at the loop's start, until the transport stops, the scene changes
+  or EDIT + its key erases it; played from the start, it is struck at its place and holds again. Drones and held
+  notes are the last the voice budget ever fades. For a slow, evolving drone: LFO RATE 0 is 0.05 Hz (a 20 s
+  cycle), RATE 28 0.2 Hz.
 - **Undo / redo:** EDIT + OCT− / OCT+. **Clear:** EDIT + REC (at once), REC held 2 s, or SAVE → TOOLS → CLRSQ; each undone with EDIT + OCT−.
 
 ## Scenes and songs
@@ -337,6 +346,18 @@ held 1 s stores what plays now into that scene (`SCENE 3 STORED`). More keys in 
 a quick chain. SAVE + F# then a key copies the scene. SAVE + G#: loop / song mode. SAVE + A#: song recording (each
 launch a section). The CHAIN page edits the song. Eight songs (A–H) in flash, 32 KB each; AUTOSAVE saves after 3 s
 stopped and idle.
+
+**◆ A song in order, two ways.** Record your loops into scenes (each scene key, SAVE + key), then:
+
+- **Type it:** SAVE → CHAIN. The page shows the order as tiles (`A1 A2 A2 A1 A3`, each scene's bars under it, then
+  END). Tap a scene's white key to add it after the cursor (STEP, KNOB 1; on END: at the end); the same key again
+  adds it once more. F#3 deletes the one at the cursor, G#3 the last one (a slip undone), A#3 sets END: LOOP (round
+  again) or STOP (the transport stops after the last). Each section plays its scene's own length; BARS and REPEAT
+  (KNOB 3, 4) change the one at the cursor. Typing an order puts the song in SONG mode (SAVE + G#: back to LOOP).
+- **Play it once:** while playing, SAVE + A# starts SONG REC; every scene you launch (SAVE + its key, at the bar) is
+  written into the order with the bars it played. PLAY stops it, and the song plays it back from then on.
+
+While the song plays, LOOP's title says where it is (`SONG 3/5 A2`) and the CHAIN page fills that tile red.
 
 ## MIDI
 
@@ -471,7 +492,8 @@ keeps the whole FM-1. Putting a song file back from the computer is not there ye
   matters least, on any channel: one already let go, the quietest first, else the oldest of the heaviest, faded out
   rather than cut. The budget also follows the real load: when the sound engine runs past about 72 % of its time
   (many FM6 chords, effects and filters in a loop), it tightens, and above about 85 % a voice fades at once; when the
-  load is easy again it comes back up over a few seconds. So the loop thins a little instead of the audio breaking
+  load is easy again it comes back up over a few seconds. It never fades the last few voices: a load that stays high
+  with only a few notes is the effects', not the voices'. So the loop thins a little instead of the audio breaking
   up. Fewer notes held at once, a lighter instrument than FM6 or SUPER, or shorter releases help. SETTINGS → SYSTEM →
   CPU shows the load: a few % standing by.
 - **`CPU OVERLOAD`.** A block of sound did run late (a click may be heard): as for VOICE LIMIT.
@@ -520,6 +542,8 @@ keeps the whole FM-1. Putting a song file back from the computer is not there ye
 | Save the song | SAVE, SAVE |
 | PLAY ↔ LOOP | SHIFT + HOME |
 | Name a channel | SHIFT + SAVE |
+| Latch notes (a drone) | SHIFT + PLAY, tap keys; SHIFT + PLAY again: off |
+| Type the song's order | SAVE → CHAIN, tap scene keys (F#3 delete, G#3 undo, A#3 END) |
 
 ## Not yet
 

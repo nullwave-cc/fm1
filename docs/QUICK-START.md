@@ -1,6 +1,6 @@
 # nullwave fm1: quick start
 
-Eight steps from switching on to scenes. Each step: what to press (`press:`, in order, the FM-1's controls as the
+Nine steps from switching on to a song. Each step: what to press (`press:`, in order, the FM-1's controls as the
 site's drawing names them, device.js: the controls held together in a group, the groups in turn between `|`), the
 screen you get (`screen:`, a name of the promo set, docs/img/promo; `@splash` the boot logo), and two short lines.
 tools/quick_start.py builds the page (nullwave.cc/fm1/quick-start/); tools/doc_check.py checks it. The full reference
@@ -54,6 +54,13 @@ press: SAVE,KEYS | SAVE,KEYS
 screen: LAYER_SAVE
 
 Hold **SAVE** and press a key to launch that scene at the next bar. Hold the key for a second to store what plays now into it.
+
+## A song in order
+
+press: SAVE | SELECT | KEYS
+screen: SAVE_CHAIN
+
+Tap **SAVE**, turn SELECT to CHAIN, and tap scene keys in the order the song goes: A1 A2 A2 A1 A3. PLAY plays it in that order.
 
 ## Settings
 

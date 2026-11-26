@@ -150,13 +150,8 @@ wait 4100
 tap PLAY
 wait 30
 expect nchain 2
-# song mode (SAVE held + G#3): the chain plays
-press SAVE
-wait 30
-key 3 down 100
-wait 20
-key 3 up
-release SAVE
+# the recording ended: the song plays its chain (SONG mode on by itself; SAVE + G#3 flips it)
+expect song_mode 1
 tap PLAY
 wait 100
 expect scene 0

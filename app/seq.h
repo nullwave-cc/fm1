@@ -23,7 +23,8 @@
 #define SEQ_NOLOCK 0x7FFF                /* seq_step_lock: none */
 #define SONG_NAME 8                      /* a channel's name: up to 8 characters (A-Z 0-9 space - . / + # & !) */
 
-enum { EV_RATCH = 3, EV_LOCK = 4, EV_FILL = 8, EV_NOFILL = 16, EV_SKIP = 64, EV_NEW = 128 };   /* FILL: plays only in a
+enum { EV_RATCH = 3, EV_LOCK = 4, EV_FILL = 8, EV_NOFILL = 16, EV_DRONE = 32, EV_SKIP = 64, EV_NEW = 128 };   /* DRONE:
+                                         * held over the whole pattern when recorded: sounds on, never struck again */   /* FILL: plays only in a
                                          * fill; NEW: recorded in the REPLACE pass under way (never kept in a song) */
 typedef struct {
     uint16_t pos;                        /* ticks from the pattern's start */
@@ -99,7 +100,9 @@ int seq_take_kept(void);                 /* 1 once after a REPLACE pass stopped 
 int32_t seq_take_ms(void);               /* a free take: its length so far */
 void seq_clear(uint32_t ch);             /* hold REC: the channel's pattern emptied (undo brings it back) */
 void seq_note_on(uint32_t ch, uint32_t note, uint32_t vel);   /* a played note: recorded, arms a take */
-void seq_note_off(uint32_t ch, uint32_t note);
+int seq_note_off(uint32_t ch, uint32_t note);   /* 1: the note goes on, recorded as a DRONE (the caller keeps it on) */
+void seq_drones_off(int32_t ch);           /* the drones sounding end (-1: every channel) */
+int seq_drones(uint32_t ch);               /* how many drones the channel's pattern sounds now */
 uint32_t seq_bpm10(void);
 void seq_set_bpm10(uint32_t b);
 void seq_tap(void);                      /* tap tempo */
@@ -146,6 +149,12 @@ uint32_t seq_scene(void);
 int32_t seq_queued(void);                /* the scene that starts next, -1 none */
 void seq_launch(uint32_t scene);
 void seq_qchain_add(uint32_t scene);     /* SAVE held, more keys: a quick chain */
+uint32_t seq_scene_bars(uint32_t s);     /* a scene's length: its longest pattern, in bars */
+int seq_chain_insert(uint32_t pos, uint32_t scene);   /* CHAIN page: a section with the scene, before pos */
+void seq_chain_delete(uint32_t pos);
+int seq_chain_end_stop(void);            /* the song's END: 1 stop after the last section, 0 round again */
+void seq_chain_set_end_stop(int on);
+uint32_t seq_sect(void);                 /* the section playing (song mode) */
 uint32_t seq_qchain_len(void);
 int seq_scene_used(uint32_t scene);
 void seq_scene_copy(uint32_t from, uint32_t to);
@@ -171,6 +180,8 @@ void seq_touch(void);                    /* the song changed */
 /* the arpeggiator (a channel's ARP MODE not OFF), note repeat (the ARP layer), strummed chords, fills */
 void seq_arp_key(uint32_t ch, uint32_t note, uint32_t vel, int on);
 int seq_arp_on(uint32_t ch);
+void seq_hold(uint32_t ch, int on);      /* HOLD (SHIFT + PLAY): the keys latch; off, the latched notes end */
+int seq_held_n(uint32_t ch);             /* the notes HOLD keeps sounding now */
 uint32_t seq_arp_preview(uint32_t ch, uint8_t *out, uint32_t max);   /* the graph view: the arp's next notes */
 void seq_roll(uint32_t ch, uint32_t note, uint32_t vel, int on);
 void seq_strum(uint32_t ch, uint32_t note, uint32_t vel, uint32_t ms);

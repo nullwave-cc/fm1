@@ -1,0 +1,76 @@
+# SAVE > CHAIN: the song's order typed on the keys (a white key its scene, after the cursor; F#3 deletes the one at
+# the cursor, G#3 the last; A#3 END LOOP / STOP), shown as tiles; the song then plays it in order, round again or
+# stopping. Run by tests/run_tests.sh:
+#   app/build/host/nullwave_host app/tests/chain_entry.txt app/build/host
+wait 1800
+tap SAVE
+wait 30
+turn SELECT 2
+wait 30
+expect page 18
+expect nchain 0
+# A1 A2 A2 A1 A3 (white keys 1, 2, 2, 1, 3: F3, G3, G3, F3, A3)
+tapkey 0 100
+tapkey 2 100
+tapkey 2 100
+tapkey 0 100
+tapkey 4 100
+wait 30
+expect nchain 5
+expect chain0 1
+expect chain1 2
+expect chain2 2
+expect chain3 1
+expect chain4 3
+expect voices 0
+shot chain.png
+# a slip: A4 added, G#3 takes it back
+tapkey 6 100
+expect nchain 6
+tapkey 3 100
+expect nchain 5
+expect chain4 3
+# the cursor on the second (KNOB 1 to 1), F#3 deletes it, a new A2 goes after the cursor
+turn K1 -10
+turn K1 1
+wait 30
+tapkey 1 100
+expect nchain 4
+expect chain1 2
+tapkey 2 100
+expect nchain 5
+expect chain1 2
+expect chain2 2
+# played: in order, a bar each (the scenes' own length), round again
+tap HOME
+wait 30
+expect section 0
+expect scene 0
+tap PLAY
+wait 100
+expect scene 0
+wait 2000
+expect scene 1
+wait 2000
+expect scene 1
+wait 2000
+expect scene 0
+wait 2000
+expect scene 2
+wait 2000
+expect scene 0
+expect playing 1
+# END STOP: after the last, the transport stops
+tap PLAY
+wait 100
+tap SAVE
+wait 30
+turn SELECT 2
+wait 30
+tapkey 5 100
+expect song_end 1
+tap HOME
+wait 30
+tap PLAY
+wait 10200
+expect playing 0

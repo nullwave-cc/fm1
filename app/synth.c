@@ -91,6 +91,16 @@ static volatile uint32_t q_w, q_r;
 static volatile uint8_t all_off, silence;
 static int16_t shed_q[NPART][NVOICE];     /* a voice being shed: its fade, Q15 (32767: not) */
 static volatile uint32_t budget_sheds;    /* voices the budget faded (the screen says VOICE LIMIT) */
+static uint32_t prot[NCH][4];            /* notes held on purpose (drones, HOLD): faded last by the budget, bit note */
+void synth_protect(uint32_t ch, uint32_t note, int on)
+{
+    ch %= NCH;
+    note &= 127u;
+    if (on)
+        prot[ch][note >> 5] |= 1u << (note & 31u);
+    else
+        prot[ch][note >> 5] &= ~(1u << (note & 31u));
+}
 uint32_t synth_budget_sheds(void) { return budget_sheds; }
 
 /* --------------------------------------------------------------- tables --- */
@@ -938,7 +948,7 @@ static int own_state(const engine_t *e)
 static const uint8_t ENG_COST[] = {4, 40, 7, 2, 4, 29, 5, 17, 16, 13, 17, 3, 3, 59};   /* (synth.c ENGINES' order) */
 #define VB_DEF 650u                      /* the voices' share: 65 %, the rest the effects, the mix, the screen */
 #define VB_MIN 160u
-static uint32_t vbudget = VB_DEF, vb_easy;
+static uint32_t vbudget = VB_DEF, vb_easy, vb_hot;
 static uint32_t eng_cost(uint32_t ch) { return run_eng[ch] < sizeof ENG_COST ? ENG_COST[run_eng[ch]] : 10u; }
 static uint32_t voices_cost(void)        /* the voices sounding (not fading out), weighed */
 {
@@ -962,6 +972,8 @@ static int voice_shed_one(int32_t except_ch, uint32_t except_k)   /* the voice t
             /* (let go first, the quietest of them; then the heaviest, the oldest) */
             score = !v->gate ? ((int64_t)1 << 40) + (32767 - (v->env_out < 0 ? 0 : v->env_out))
                              : ((int64_t)eng_cost(ch) << 32) + (int64_t)(0xFFFFFFFFu - v->age);
+            if (prot[ch][v->note >> 5 & 3u] >> (v->note & 31u) & 1u)
+                score = (int64_t)(0xFFFFFFFFu - v->age) >> 1;   /* (a drone, a held note: only when nothing else is) */
             if (score > best) {
                 best = score;
                 bc = ch;
@@ -990,14 +1002,20 @@ void synth_load(uint32_t p)
         vb_easy = 0;
         if (used > VB_MIN && used < vbudget + 60u)
             vbudget = used - (used > VB_MIN + 40u ? 40u : used - VB_MIN);
-        if (p > 1360u)
+        if (p > 1360u && used > VB_MIN && ++vb_hot >= 3u) {   /* (three checks running: not a single slow block; and
+                                          * a few voices are never the load, never shed down to silence) */
+            vb_hot = 0;
             voice_shed_one(-1, 0);
-    } else if (p < 720u && vbudget < VB_DEF && ++vb_easy > 512u) {
+        }
+        if (p <= 1360u)
+            vb_hot = 0;
+    } else if ((vb_hot = 0) == 0 && p < 720u && vbudget < VB_DEF && ++vb_easy > 512u) {
         vb_easy = 0;
         vbudget += 20u;
     }
 }
 uint32_t synth_budget(void) { return vbudget; }
+void synth_budget_reset(void) { vbudget = VB_DEF; vb_easy = 0; }   /* (a song loaded: the budget afresh) */
 uint32_t synth_budget_used(void) { return voices_cost(); }
 
 static void voice_start(uint32_t ch, uint32_t note, uint32_t vel)

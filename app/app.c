@@ -88,10 +88,11 @@ static void note_on(uint32_t ch, int32_t note, uint32_t vel)
 
 static void note_off(uint32_t ch, int32_t note)
 {
-    uint32_t f = plat_lock();
-    synth_note_off(ch, (uint32_t)note);
-    plat_unlock(f);
-    seq_note_off(ch, (uint32_t)note);
+    if (!seq_note_off(ch, (uint32_t)note)) {   /* (a drone recorded: it goes on) */
+        uint32_t f = plat_lock();
+        synth_note_off(ch, (uint32_t)note);
+        plat_unlock(f);
+    }
     if (last_note == note && last_ch == ch)
         last_note = -1;
 }
@@ -120,6 +121,7 @@ static void ccq_put(uint32_t v)
     if (ccq_w - ccq_r < CCQ_N)
         ccq[ccq_w++ % CCQ_N] = v;
 }
+static volatile uint32_t midi_note_t;     /* when a MIDI note last came in (0: never) */
 static void midi_in(void)                    /* audio interrupt: the packets that came in */
 {
     uint32_t pkt;
@@ -133,6 +135,8 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
         }
         if (st >= 0xF0u)
             continue;
+        if ((st & 0xF0u) == 0x90u || (st & 0xF0u) == 0x80u)
+            midi_note_t = plat_ms() | 1u;   /* (notes come from outside: the stuck-note sweep leaves them be) */
         mc = (st & 0x0Fu) + 1u;
         if (prefs.remote && mc == prefs.remote && (st & 0xF0u) == 0xB0u && d1 >= 102u && d1 <= 115u) {
             uint32_t b = d1 - 102u;      /* REMOTE: FX, SEL, ENV ... OCT+ (plat.h's order) */
@@ -210,8 +214,8 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
                 sus_held[ch][d1 >> 5] |= 1u << (d1 & 31u);
                 continue;
             }
-            synth_note_off(ch, d1);
-            seq_note_off(ch, d1);
+            if (!seq_note_off(ch, d1))   /* (a drone recorded: it goes on) */
+                synth_note_off(ch, d1);
             if (last_note == (int32_t)d1)
                 last_note = -1;
         }
@@ -236,6 +240,15 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     rd_budget += budget;
 #endif
     p = budget ? dt * 1600u / budget : 0u;   /* (x16: the peak falls a 64th a block, ~1.5 s) */
+#ifdef PLAT_HOST
+    {                                    /* (the host: NW_LOADX=40 scales its render time to the FM-1's, for the guard) */
+        static int lx = -1;
+        if (lx < 0)
+            lx = getenv("NW_LOADX") ? atoi(getenv("NW_LOADX")) : 0;
+        if (lx > 0)
+            p = budget ? (uint32_t)((uint64_t)dt * 1600u * (uint32_t)lx / budget) : 0u;
+    }
+#endif
     if (shed_wait)
         shed_wait--;
     else if (p > 1150u) {                /* over ~72 %: the voices' budget tightens (and above ~85 % a voice fades now),
@@ -626,6 +639,39 @@ int app_expect(const char *what, int *got)
         while (w[k] && nm[k] && (nm[k] == w[k] || (w[k] == '_' && nm[k] == ' ')))
             k++;
         *got = !w[k] && !nm[k];
+        return 1;
+    }
+    if (!strcmp(what, "gated")) {        /* the selected channel's voices still held (gate on) */
+        synth_vview_t vv[SYN_VMAX];
+        uint32_t n = synth_voice_view(set.channel, vv), j;
+        *got = 0;
+        for (j = 0; j < n; j++)
+            *got += vv[j].gate != 0;
+        return 1;
+    }
+    if (!strncmp(what, "chain", 5) && what[5] >= '0' && what[5] <= '9') {   /* chainN: section N's scene + 1 */
+        uint32_t i = (uint32_t)atoi(what + 5);
+        *got = i < song.nchain ? song.chain[i].scene + 1 : 0;
+        return 1;
+    }
+    if (!strcmp(what, "song_mode")) {    /* 1: the song plays its order (SAVE + G#), 0 LOOP */
+        *got = song.mode == MODE_SONG;
+        return 1;
+    }
+    if (!strcmp(what, "song_end")) {     /* the song's END: 1 STOP */
+        *got = seq_chain_end_stop();
+        return 1;
+    }
+    if (!strcmp(what, "hold")) {         /* HOLD on the selected channel (SHIFT + PLAY) */
+        *got = synth_sound(set.channel)->arp_hold;
+        return 1;
+    }
+    if (!strcmp(what, "drones")) {       /* the selected channel's drones sounding */
+        *got = seq_drones(set.channel);
+        return 1;
+    }
+    if (!strcmp(what, "chord")) {        /* the song's CHORD (SEL KEY, KNOB 4): 0 OFF .. 5 POWER */
+        *got = song.chord;
         return 1;
     }
     if (!strcmp(what, "transpose")) {    /* the song's TRANS (SEL) */

@@ -161,11 +161,14 @@ def install_screens(out):
     s.write_text("wait 1250\nexpect hd:INSTALLED 1\nwait 1800\nexpect draw_update 1\nexpect hd:INSTALLING 1\n"
                  "expect draw_factory 1\nexpect hd:FACTORY_RESET 1\n"
                  "reboot\nwait 1800\npress HOME\nwait 900\nrelease HOME\nwait 50\nturn SELECT 5\nwait 400\n"
-                 "expect hd:SET_SYSTEM 1\n")
+                 "expect hd:SET_SYSTEM 1\n"
+                 "press HOME\nwait 900\nrelease HOME\nwait 50\ntap SAVE\nwait 30\nturn SELECT 2\nwait 30\n"
+                 "tapkey 0 100\ntapkey 2 100\ntapkey 2 100\ntapkey 0 100\ntapkey 4 100\nwait 1600\n"
+                 "expect hd:SAVE_CHAIN 1\n")
     subprocess.run([str(HD / "nullwave_hd"), str(s), str(d)], cwd=ROOT,
                    env=dict(os.environ, NW_HD_DIR=str(d), NW_FRESH="1"), stdout=subprocess.DEVNULL)
     pr = ROOT / "docs" / "img" / "promo"
-    for name in ("INSTALLING", "INSTALLED", "FACTORY_RESET", "SET_SYSTEM"):
+    for name in ("INSTALLING", "INSTALLED", "FACTORY_RESET", "SET_SYSTEM", "SAVE_CHAIN"):
         im = load(d / f"{name}@4x.rgb")
         for theme in ("dark", "light"):   # (the theme the FM-1 had: drawn dark here, the device's first start)
             save(im, pr / f"{name}-{theme}.png", pr / f"{name}-{theme}.webp", size=960)

@@ -1,0 +1,404 @@
+# CHORD (SEL > KEY, KNOB 4) through its values on a mono and a poly channel: each sounds, the black keys change
+# the chord (silent alone), OFF plays single notes again; a key held while CHORD, KEYS or the octave change leaves
+# nothing on (keys_let_go), and a song loaded starts clean. Run by tests/run_tests.sh:
+#   app/build/host/nullwave_host app/tests/chord_mode.txt app/build/host
+wait 1800
+tap SEL
+wait 30
+expect page 6
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+expect gated 1
+key 7 up
+wait 30
+expect gated 0
+turn K4 1
+wait 30
+expect chord 1
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 11 down 100
+wait 150
+expect peak_db_min -40
+key 11 up
+wait 30
+expect gated 0
+turn K4 1
+wait 30
+expect chord 2
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 11 down 100
+wait 150
+expect peak_db_min -40
+key 11 up
+wait 30
+expect gated 0
+turn K4 1
+wait 30
+expect chord 3
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 11 down 100
+wait 150
+expect peak_db_min -40
+key 11 up
+wait 30
+expect gated 0
+turn K4 1
+wait 30
+expect chord 4
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 11 down 100
+wait 150
+expect peak_db_min -40
+key 11 up
+wait 30
+expect gated 0
+turn K4 1
+wait 30
+expect chord 5
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 11 down 100
+wait 150
+expect peak_db_min -40
+key 11 up
+wait 30
+expect gated 0
+turn K4 -10
+wait 30
+expect chord 0
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+expect gated 1
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 8 down 100
+wait 150
+expect peak_db_min -40
+expect gated 1
+key 8 up
+wait 30
+expect gated 0
+# KEYS WHITE and SNAP with a chord, then back
+turn K3 2
+turn K4 1
+wait 30
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 9 down 100
+wait 150
+expect peak_db_min -40
+key 9 up
+wait 30
+expect gated 0
+turn K3 -1
+wait 30
+wait 700
+peakreset
+key 9 down 100
+wait 150
+expect peak_db_min -40
+key 9 up
+wait 30
+expect gated 0
+turn K3 -1
+turn K4 -10
+wait 30
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+expect gated 1
+key 7 up
+wait 30
+expect gated 0
+tap HOME
+wait 30
+# channel 2 (FM6, poly)
+turn ALGO 1
+wait 100
+tap SEL
+wait 30
+expect page 6
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+expect gated 1
+key 7 up
+wait 30
+expect gated 0
+turn K4 1
+wait 30
+expect chord 1
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+expect gated 3
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 11 down 100
+wait 150
+expect peak_db_min -40
+key 11 up
+wait 30
+expect gated 0
+turn K4 1
+wait 30
+expect chord 2
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+expect gated 4
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 11 down 100
+wait 150
+expect peak_db_min -40
+key 11 up
+wait 30
+expect gated 0
+turn K4 1
+wait 30
+expect chord 3
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+expect gated 4
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 11 down 100
+wait 150
+expect peak_db_min -40
+key 11 up
+wait 30
+expect gated 0
+turn K4 1
+wait 30
+expect chord 4
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+expect gated 3
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 11 down 100
+wait 150
+expect peak_db_min -40
+key 11 up
+wait 30
+expect gated 0
+turn K4 1
+wait 30
+expect chord 5
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+expect gated 3
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 11 down 100
+wait 150
+expect peak_db_min -40
+key 11 up
+wait 30
+expect gated 0
+turn K4 -10
+wait 30
+expect chord 0
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+expect gated 1
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 8 down 100
+wait 150
+expect peak_db_min -40
+expect gated 1
+key 8 up
+wait 30
+expect gated 0
+# KEYS WHITE and SNAP with a chord, then back
+turn K3 2
+turn K4 1
+wait 30
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+key 7 up
+wait 30
+expect gated 0
+wait 700
+peakreset
+key 9 down 100
+wait 150
+expect peak_db_min -40
+key 9 up
+wait 30
+expect gated 0
+turn K3 -1
+wait 30
+wait 700
+peakreset
+key 9 down 100
+wait 150
+expect peak_db_min -40
+key 9 up
+wait 30
+expect gated 0
+turn K3 -1
+turn K4 -10
+wait 30
+wait 700
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+expect gated 1
+key 7 up
+wait 30
+expect gated 0
+tap HOME
+wait 30
+# a key held while CHORD changes: let go at once, nothing left on after
+tap SEL
+wait 30
+key 7 down 100
+wait 100
+turn K4 1
+wait 30
+expect gated 0
+key 7 up
+wait 30
+key 7 down 100
+wait 100
+expect gated 3
+key 7 up
+wait 30
+expect gated 0
+key 7 down 100
+wait 100
+tap OCT+
+wait 30
+expect gated 0
+key 7 up
+tap OCT-
+wait 30
+turn K4 -10
+wait 30
+expect chord 0
+# the song saved with CHORD on, loaded again: it plays
+turn K4 1
+wait 30
+tap SAVE
+wait 30
+tap SAVE
+wait 30
+tap SAVE
+wait 3000
+reboot
+wait 1800
+turn ALGO 1
+wait 100
+expect chord 1
+peakreset
+key 7 down 100
+wait 150
+expect peak_db_min -40
+expect gated 3
+key 7 up

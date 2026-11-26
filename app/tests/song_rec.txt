@@ -1,0 +1,34 @@
+# The arrangement recorded live: SAVE + A# while playing starts SONG REC; each scene launched (SAVE + its key, at the
+# bar) is written into the song's order with the bars it played; PLAY stops it and the song then plays it.
+# Run by tests/run_tests.sh:
+#   app/build/host/nullwave_host app/tests/song_rec.txt app/build/host
+wait 1800
+tap PLAY
+wait 100
+press SAVE
+wait 400
+tapkey 5 100
+release SAVE
+wait 30
+expect nchain 1
+expect chain0 1
+# 2 bars of scene 1, then scene 2 for a bar, then scene 1 again
+wait 3800
+press SAVE
+wait 30
+tapkey 2 100
+release SAVE
+wait 2000
+press SAVE
+wait 30
+tapkey 0 100
+release SAVE
+wait 2100
+tap PLAY
+wait 100
+expect playing 0
+expect nchain 3
+expect chain0 1
+expect chain1 2
+expect chain2 1
+expect song_mode 1

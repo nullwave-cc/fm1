@@ -26,6 +26,7 @@ static int16_t count_t = -1;             /* the count-in: its tick, -1 none */
 static volatile int16_t erase_note[NCH] = {-1, -1, -1, -1, -1, -1};
 static uint8_t qchain[8], qchain_n, qchain_i;
 static uint8_t sect_i, sect_bars, sect_rep, song_rec;
+static volatile uint8_t song_end;        /* the chain played to its end with END STOP: stop after the tick */
 static uint32_t sect_t0;
 
 /* what waits: note-offs, ratchets' notes, locks' ends */
@@ -36,6 +37,34 @@ static uint32_t npend;
 
 /* the notes being recorded: the event and when it started */
 static struct { int16_t idx; uint32_t t0; } open_n[NCH][128];
+static uint32_t drone_on[NCH][4];        /* the DRONE notes sounding (as stored, before TRANS): bit note */
+static uint8_t drone_tr[NCH][128];       /* (the note each sounds at: TRANS when it started) */
+void seq_drones_off(int32_t ch)
+{
+    uint32_t c, n;
+    for (c = 0; c < NCH; c++) {
+        if (ch >= 0 && (int32_t)c != ch)
+            continue;
+        for (n = 0; n < 128u; n++)
+            if (drone_on[c][n >> 5] >> (n & 31u) & 1u) {
+                synth_note_off(c, drone_tr[c][n]);
+                synth_protect(c, drone_tr[c][n], 0);
+            }
+        memset(drone_on[c], 0, sizeof drone_on[c]);
+    }
+}
+int seq_drones(uint32_t ch)
+{
+    uint32_t k, n = 0;
+    for (k = 0; k < 4u; k++) {
+        uint32_t x = drone_on[ch % NCH][k];
+        while (x) {
+            n += x & 1u;
+            x >>= 1;
+        }
+    }
+    return (int)n;
+}
 
 /* a free take: times in samples */
 #define TAKE_N 160u
@@ -515,6 +544,7 @@ void seq_clear(uint32_t ch)
     undo_take(ch);
     f = lock_();
     seq_pat(ch)->n = 0;
+    seq_drones_off((int32_t)ch);
     unlock_(f);
     seq_touch();
 }
@@ -588,6 +618,7 @@ static void scene_apply(uint32_t s, uint32_t t)
         rec = REC_OFF;
     }
     cur_scene = (uint8_t)(s % NSCENE);
+    seq_drones_off(-1);                  /* (another scene: its own drones, struck at their place) */
     for (ch = 0; ch < NCH; ch++) {
         pstart[ch] = t;
         synth_set_level(ch, sc->level[ch]);
@@ -704,13 +735,67 @@ void seq_song_rec(int on)
         song.chain[0].bars = 0;
         song.chain[0].reps = 1;
         sect_t0 = tick;
-    } else if (song.nchain && song.chain[song.nchain - 1u].bars == 0u) {
-        uint32_t b = (tick - sect_t0 + TBAR / 2u) / TBAR;
-        song.chain[song.nchain - 1u].bars = (uint8_t)(b < 1u ? 1u : b > 64u ? 64u : b);
+    } else {
+        if (song.nchain && song.chain[song.nchain - 1u].bars == 0u) {
+            uint32_t b = (tick - sect_t0 + TBAR / 2u) / TBAR;
+            song.chain[song.nchain - 1u].bars = (uint8_t)(b < 1u ? 1u : b > 64u ? 64u : b);
+        }
+        if (song.nchain)                 /* (recorded: the song plays it from now on) */
+            song.mode = MODE_SONG;
     }
     unlock_(f);
     seq_touch();
 }
+
+/* the CHAIN page's keys: the song's order typed in, a scene a key (its own length in bars), deleted, its END */
+static uint32_t scene_len(uint32_t s);
+uint32_t seq_scene_bars(uint32_t s) { return scene_len(s % NSCENE) / TBAR; }
+int seq_chain_insert(uint32_t pos, uint32_t scene)   /* a section with the scene before pos (nchain: at the end) */
+{
+    uint32_t f, i, b;
+    uint8_t end = song.chain[0].rsv & 1u;   /* (the song's END is kept in the first place's spare byte) */
+    if (song.nchain >= NCHAIN)
+        return -1;
+    f = lock_();
+    pos = pos > song.nchain ? song.nchain : pos;
+    for (i = song.nchain; i > pos; i--)
+        song.chain[i] = song.chain[i - 1u];
+    b = scene_len(scene % NSCENE) / TBAR;
+    song.chain[pos].scene = (uint8_t)(scene % NSCENE);
+    song.chain[pos].bars = (uint8_t)(b < 1u ? 1u : b > 64u ? 64u : b);
+    song.chain[pos].reps = 1;
+    song.chain[pos].rsv = 0;
+    song.chain[0].rsv = end;
+    if (song.nchain)
+        song.chain[1].rsv = 0;
+    song.nchain++;
+    unlock_(f);
+    seq_touch();
+    return 0;
+}
+void seq_chain_delete(uint32_t pos)
+{
+    uint32_t f, i;
+    uint8_t end = song.chain[0].rsv & 1u;
+    if (pos >= song.nchain)
+        return;
+    f = lock_();
+    for (i = pos; i + 1u < song.nchain; i++)
+        song.chain[i] = song.chain[i + 1u];
+    song.nchain--;
+    song.chain[0].rsv = end;
+    if (sect_i >= song.nchain)
+        sect_i = 0;
+    unlock_(f);
+    seq_touch();
+}
+int seq_chain_end_stop(void) { return song.chain[0].rsv & 1u; }
+void seq_chain_set_end_stop(int on)
+{
+    song.chain[0].rsv = (uint8_t)((song.chain[0].rsv & ~1u) | (on ? 1u : 0u));
+    seq_touch();
+}
+uint32_t seq_sect(void) { return sect_i; }   /* the section playing (song mode) */
 
 /* ------------------------------------- arp, note repeat, strum, fills --- */
 static volatile uint8_t fill_hold, fill_arm, fill_now;
@@ -748,13 +833,59 @@ static uint32_t atick;                   /* ticks, always running */
 static uint32_t aacc;
 static const uint8_t ARP_TICKS[6] = {96, 48, 32, 24, 16, 12};
 
+static int note_end_(uint32_t ch, uint32_t note);
 int seq_arp_on(uint32_t ch) { const sound_t *s = synth_sound(ch); return s->arp != 0u || s->arp_hold; }
+/* HOLD on or off (SHIFT + PLAY; ARP 2's HOLD): off, the latched notes end */
+void seq_hold(uint32_t ch, int on)
+{
+    uint32_t f, i;
+    ch %= NCH;
+    synth_param_set(ch, SP_ARP_HOLD, on ? 1 : 0);
+    if (on)
+        return;
+    f = lock_();
+    if (!synth_sound(ch)->arp)
+        for (i = 0; i < arp[ch].n; i++) {
+            if (!note_end_(ch, arp[ch].note[i]))
+                synth_note_off(ch, arp[ch].note[i]);
+            synth_protect(ch, arp[ch].note[i], 0);
+        }
+    arp[ch].n = 0;
+    arp[ch].held = 0;
+    unlock_(f);
+}
+int seq_held_n(uint32_t ch) { return synth_sound(ch % NCH)->arp_hold ? (int)arp[ch % NCH].n : 0; }
 
 static void rec_insert(uint32_t ch, uint32_t note, uint32_t vel);
 void seq_arp_key(uint32_t ch, uint32_t note, uint32_t vel, int on)
 {
     uint32_t f = lock_(), i;
     ch %= NCH;
+    if (on && synth_sound(ch)->arp_hold && !synth_sound(ch)->arp) {   /* HOLD, the arp off: each key latches its note,
+                                          * a latched one tapped again ends (a drone built up note by note) */
+        for (i = 0; i < arp[ch].n && arp[ch].note[i] != note; i++)
+            ;
+        if (i < arp[ch].n) {
+            uint32_t j;
+            if (!note_end_(ch, note))
+                synth_note_off(ch, note);
+            synth_protect(ch, note, 0);
+            for (j = i; j + 1u < arp[ch].n; j++) {
+                arp[ch].note[j] = arp[ch].note[j + 1u];
+                arp[ch].vel[j] = arp[ch].vel[j + 1u];
+            }
+            arp[ch].n--;
+        } else if (arp[ch].n < ARP_MAX) {
+            synth_note_on(ch, note, vel);
+            synth_protect(ch, note, 1);
+            if (rec == REC_ON && playing && ch == rec_ch)
+                rec_insert(ch, note, vel);
+            arp[ch].note[arp[ch].n] = (uint8_t)note;
+            arp[ch].vel[arp[ch].n++] = (uint8_t)vel;
+        }
+        unlock_(f);
+        return;
+    }
     if (on) {
         const sound_t *s = synth_sound(ch);
         if (s->arp_hold && !arp[ch].held) {   /* HOLD: the first key with none down replaces what was latched */
@@ -1018,12 +1149,32 @@ static void channel_tick(uint32_t ch, uint32_t t)
         }
         if (seq_cfg.rec_replace && rec == REC_ON && ch == rec_ch && !(e->fl & EV_NEW))
             continue;                    /* REPLACE recording: the last take silent (kept till the pass is full) */
+        if (rec == REC_ON && ch == rec_ch && open_n[ch][e->note & 127u].idx == (int16_t)i)
+            continue;                    /* (held on the keys as it records: it sounds already, not struck again) */
+        if ((e->fl & EV_DRONE) && !(erase_note[ch] >= 0 && e->note == (uint32_t)erase_note[ch])) {   /* a drone: struck
+                                          * once, on till the transport stops or the scene changes (EDIT + key: erased) */
+            uint32_t nn = e->note & 127u;
+            if (!(drone_on[ch][nn >> 5] >> (nn & 31u) & 1u)) {
+                uint32_t pn = synth_is_kit(ch) ? nn : (uint32_t)clamp((int32_t)nn + song.transpose, 0, 127);
+                drone_on[ch][nn >> 5] |= 1u << (nn & 31u);
+                drone_tr[ch][nn] = (uint8_t)pn;
+                synth_note_on(ch, pn, e->vel);
+                synth_protect(ch, pn, 1);
+                midi_seq_out(ch, pn, e->vel);
+            }
+            continue;
+        }
         if (e->fl & EV_LOCK) {
             synth_lock(ch, e->note, (int32_t)e->vel - 128);
             pend_add(t + st, PD_UNLOCK, ch, 0, 0, 0);
             continue;
         }
         if (erase_note[ch] >= 0 && e->note == (uint32_t)erase_note[ch]) {   /* EDIT held on the key: erased */
+            if (drone_on[ch][e->note >> 5 & 3u] >> (e->note & 31u) & 1u) {
+                synth_note_off(ch, drone_tr[ch][e->note & 127u]);
+                synth_protect(ch, drone_tr[ch][e->note & 127u], 0);
+                drone_on[ch][e->note >> 5 & 3u] &= ~(1u << (e->note & 31u));
+            }
             ev_del(p, i);
             i--;
             dirty_f = 1;
@@ -1055,6 +1206,10 @@ static uint32_t scene_len(uint32_t s)    /* the longest pattern the scene plays 
 
 static void song_section_start(uint32_t i, uint32_t t)
 {
+    if (i >= song.nchain && i && (song.chain[0].rsv & 1u) && playing) {   /* END STOP: the last one played, stop */
+        song_end = 1;
+        return;
+    }
     sect_i = (uint8_t)(i < song.nchain ? i : 0u);
     sect_bars = 0;
     sect_rep = 0;
@@ -1160,6 +1315,7 @@ void seq_stop(void)
         seq_song_rec(0);                 /* (a song's recording ends at STOP: the last section's bars) */
     playing = 0;
     pend_flush();
+    seq_drones_off(-1);                  /* (the drones end with the transport) */
     queued = -1;
     count_t = -1;
     rec_ends();
@@ -1306,11 +1462,17 @@ void seq_note_on(uint32_t ch, uint32_t note, uint32_t vel)
     unlock_(f);
 }
 
-void seq_note_off(uint32_t ch, uint32_t note)
+static int note_end_(uint32_t ch, uint32_t note);
+int seq_note_off(uint32_t ch, uint32_t note)
 {
     uint32_t f = lock_();
-    ch %= NCH;
-    note &= 127u;
+    int drone = note_end_(ch % NCH, note & 127u);
+    unlock_(f);
+    return drone;
+}
+static int note_end_(uint32_t ch, uint32_t note)   /* (locked) a note's end: its recorded length, a drone */
+{
+    int drone = 0;
     if (rec == REC_TAKE && ch == rec_ch && take_open[note] >= 0 && (uint32_t)take_open[note] < take_n) {
         take[take_open[note]].len = take_t - take[take_open[note]].t;
         take_open[note] = -1;
@@ -1318,12 +1480,21 @@ void seq_note_off(uint32_t ch, uint32_t note)
         pat_t *p = seq_pat(ch);
         int i = open_n[ch][note].idx;
         if (i < p->n && p->ev[i].note == note && !(p->ev[i].fl & EV_LOCK)) {
-            uint32_t d = (tick - open_n[ch][note].t0) / 6u;
+            uint32_t held = tick - open_n[ch][note].t0, d = held / 6u;
             p->ev[i].len = (uint8_t)(d < 1u ? 1u : d > 255u ? 255u : d);
+            if (held >= pat_len(p) && playing) {   /* held over the whole loop: a drone, on from now */
+                uint32_t pn = synth_is_kit(ch) ? note : (uint32_t)clamp((int32_t)note + song.transpose, 0, 127);
+                p->ev[i].fl |= EV_DRONE;
+                p->ev[i].len = 255;
+                drone_on[ch][note >> 5] |= 1u << (note & 31u);
+                drone_tr[ch][note] = (uint8_t)pn;
+                synth_protect(ch, pn, 1);
+                drone = 1;
+            }
         }
         open_n[ch][note].idx = -1;
     }
-    unlock_(f);
+    return drone;
 }
 
 /* MIDI clock: the pulses move the transport (SYNC USB / TRS / BLE), START / CONTINUE / STOP */
@@ -1469,6 +1640,10 @@ void seq_render(uint32_t n)
     }
     for (i = 0; i < adv && playing; i++)
         tick_run(++tick);
+    if (song_end) {                      /* the song's last section done, END STOP: the transport stops */
+        song_end = 0;
+        seq_stop();
+    }
 }
 
 /* ---------------------------------------------------------------- songs --- */
@@ -1620,6 +1795,8 @@ static void song_start(void)             /* the song in RAM to the synth, from i
     uint32_t ch, i;
     seq_stop();
     rec = REC_OFF;
+    synth_all_off();                     /* (nothing of the last song left sounding; the voices' budget afresh) */
+    synth_budget_reset();
     for (i = 0; i < FX_N; i++)
         synth_fx_set(i, song.fx[i]);
     for (i = 0; i < MST_N; i++)

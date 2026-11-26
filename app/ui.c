@@ -569,12 +569,14 @@ static uint32_t key_notes(uint32_t k, int8_t *out)
 
 static void dirty(void) { seq_touch(); }
 
+static void keys_let_go(void);
 static void octave_step(int32_t d)
 {
     int32_t o = d ? clamp(set.octave + d, -2, 2) : 0;
     char t[4];
     if (o == set.octave)
         return;
+    keys_let_go();                       /* (the notes the keys hold end: the next press plays the new octave) */
     set.octave = (int8_t)o;
     app_mark();
     signed_text(o, t);
@@ -1271,6 +1273,8 @@ static void kn_turn(uint32_t id, int32_t e)
             return;
         }
         synth_param_turn(ch, sp, d);
+        if (sp == SP_ARP_HOLD)           /* (HOLD off: the latched notes end) */
+            seq_hold(ch, synth_sound(ch)->arp_hold);
         dirty();
         return;
     }
@@ -1314,11 +1318,11 @@ static void kn_turn(uint32_t id, int32_t e)
     case KN_CLICK: seq_cfg.click = (uint8_t)clamp(seq_cfg.click + s, 0, 2); app_mark(); break;
     case KN_LAUNCH: seq_cfg.launch = (uint8_t)clamp(seq_cfg.launch + s, 0, 2); app_mark(); break;
     case KN_MODE: seq_mode(s > 0); break;
-    case KN_ROOT: song.root = (uint8_t)((song.root + 12 + s) % 12); dirty(); break;
-    case KN_SCALE: song.scale = (uint8_t)clamp(song.scale + s, 0, 15); dirty(); break;
-    case KN_KEYS: song.keys = (uint8_t)clamp(song.keys + s, 0, 2); dirty(); break;
-    case KN_CHORD: song.chord = (uint8_t)clamp(song.chord + s, 0, 5); dirty(); break;
-    case KN_TRANS: song.transpose = (int8_t)clamp(song.transpose + s, -24, 24); dirty(); break;
+    case KN_ROOT: keys_let_go(); song.root = (uint8_t)((song.root + 12 + s) % 12); dirty(); break;
+    case KN_SCALE: keys_let_go(); song.scale = (uint8_t)clamp(song.scale + s, 0, 15); dirty(); break;
+    case KN_KEYS: keys_let_go(); song.keys = (uint8_t)clamp(song.keys + s, 0, 2); dirty(); break;
+    case KN_CHORD: keys_let_go(); song.chord = (uint8_t)clamp(song.chord + s, 0, 5); dirty(); break;
+    case KN_TRANS: keys_let_go(); song.transpose = (int8_t)clamp(song.transpose + s, -24, 24); dirty(); break;
     case KN_SYNC: seq_cfg.sync = (uint8_t)clamp(seq_cfg.sync + s, 0, FM1B_BLE ? 3 : 2); app_mark(); break;
     case KN_CLKOUT: seq_cfg.clock_out = s > 0; app_mark(); break;
     case KN_SEQOUT: seq_cfg.seq_out = s > 0; app_mark(); break;
@@ -1771,17 +1775,30 @@ static void release_key(uint32_t k)
             continue;
         }
         {
-            uint32_t f = plat_lock();
-            synth_note_off(ch, (uint32_t)pn);
-            plat_unlock(f);
+            if (!seq_note_off(ch, (uint32_t)n)) {   /* (held over the whole loop as it recorded: it goes on, a drone) */
+                uint32_t f = plat_lock();
+                synth_note_off(ch, (uint32_t)pn);
+                plat_unlock(f);
+            }
         }
-        seq_note_off(ch, (uint32_t)n);
         if (last_note == pn)
             last_note = -1;
         if (mc)
             plat_midi_send(0x08u | (0x7Fu + mc) << 8 | (uint32_t)pn << 16, TO_USB | TO_BLE);
         ui.key_note[k][i] = -1;
     }
+}
+
+/* the key, the scale, the chord, the octave or TRANS changed: every note the keys hold ends now (with the old mapping,
+ * so none is left on), and the keys held give nothing more until they are pressed again (no note-off later) */
+static void keys_let_go(void)
+{
+    uint32_t k;
+    for (k = 0; k < NKEYS; k++)
+        if (ui.key_note[k][0] >= 0) {
+            release_key(k);
+            ui.key_note[k][0] = -2;
+        }
 }
 
 /* EDIT held, the black keys by the legends printed on the panel: OP1..OP6 (FM6: that operator's pages; held 0.5 s:
@@ -1973,6 +1990,40 @@ static void layer_key(uint32_t k, int down)
     }
 }
 
+/* SAVE > CHAIN: the keys type the song's order. A white key: its scene (1-16), after the cursor (STEP, KNOB 1; past
+ * the last: at the end), its own length in bars; the same key again: the scene once more. F#3 deletes the section
+ * at the cursor, G#3 the last one (a slip undone), A#3 the song's END: LOOP (round again) or STOP */
+static void chain_key(uint32_t k)
+{
+    int w = white_index(k), b = black_index(k);
+    char t[16];
+    if (w >= 0) {
+        int at_end = ui.cs >= song.nchain;
+        uint32_t pos = at_end ? song.nchain : ui.cs + 1u;
+        if (seq_chain_insert(pos, (uint32_t)w) != 0) {
+            app_say("CHAIN", "FULL");
+            return;
+        }
+        ui.cs = (uint8_t)(at_end ? song.nchain : pos);
+        if (song.mode != MODE_SONG)      /* (an order typed in: the song plays it; SAVE + G# back to LOOP) */
+            seq_mode(1);
+        t[0] = (char)('A' + seq_slot());
+        int_text(w + 1, t + 1);
+        app_say(t, "ADDED");
+    } else if (b == 0 || b == 1) {
+        uint32_t pos = b == 1 || ui.cs >= song.nchain ? (song.nchain ? song.nchain - 1u : 0u) : ui.cs;
+        if (!song.nchain)
+            return;
+        seq_chain_delete(pos);
+        if (ui.cs > song.nchain)
+            ui.cs = (uint8_t)song.nchain;
+        app_say("CHAIN", "DELETED");
+    } else if (b == 2) {
+        seq_chain_set_end_stop(!seq_chain_end_stop());
+        app_say("SONG END", seq_chain_end_stop() ? "STOP" : "LOOP");
+    }
+}
+
 /* the keys: releases first (pass 0: a layer let go in the same frame still sees them), then presses (pass 1) */
 static void keys_input(uint32_t keys, int pass)
 {
@@ -1993,6 +2044,11 @@ static void keys_input(uint32_t keys, int pass)
             if (layer_on() && ui.layer != B_SEL + 100) {
                 layer_key(k, 1);
                 ui.key_note[k][0] = -2;          /* (taken by the layer: no note-off) */
+                continue;
+            }
+            if (ui.page == PG_CHAIN && !layer_on()) {   /* CHAIN: the keys type the song's order */
+                chain_key(k);
+                ui.key_note[k][0] = -2;
                 continue;
             }
             play_key(k, v);
@@ -2625,6 +2681,16 @@ static void button_down(uint32_t k, uint32_t now)
             ui.used[b] = 1;
     switch (k) {
     case B_PLAY:
+        if (shift_held()) {              /* SHIFT + PLAY: HOLD on the channel, the keys latch (a drone, note by note) */
+            uint32_t ch = set.channel;
+            int on = !synth_sound(ch)->arp_hold;
+            ui.oct_used = 1;
+            ui.used[k] = 1;
+            seq_hold(ch, on);
+            dirty();
+            app_say("HOLD", on ? "ON: TAP NOTES" : "OFF");
+            return;
+        }
         if (ui.fr_arm && ui.page == PG_M_SYSTEM2 && now - ui.fr_arm < 10000u) {   /* FACTORY RESET armed: held 3 s */
             ui.fr_hold = now | 1u;
             return;
@@ -3205,6 +3271,8 @@ static void loop_row(uint32_t i, int32_t y)
     {                                    /* (a chord playing: its name in place of the sound's) */
         char cn[16];
         ch_chord(i, cn);
+        if (!cn[0] && (synth_sound(i)->arp_hold || seq_drones(i)))   /* (else HOLD on, drones: said) */
+            copy_text(cn, seq_drones(i) ? "DRONE" : "HOLD", 16);
         text_fit(28, y + 22, &FONT_T, cn[0] ? cn : synth_preset_name(i), muted ? TC(DIM) : cn[0] ? TC(FG) : TC(SUB), 62);
     }
     for (k = 0; k < 16u; k++) {
@@ -3259,6 +3327,7 @@ static uint32_t chans_sig(uint32_t band)   /* what a band of LOOP's four channel
             char cn[16];
             ch_chord(i, cn);
             h = sig_str(h, cn);
+            h = sig_add(h, (uint32_t)synth_sound(i)->arp_hold << 8 | (uint32_t)seq_drones(i));
         }
     }
     return h;
@@ -3303,7 +3372,15 @@ static void draw_play_head(uint32_t now)
     rrect(4, 4, 5, 16, 2, c);
     cv_text(14, at_mid(&FONT_B, 12), &FONT_B, n, c);
     x = text_fit(28, at_mid(&FONT_B, 12), &FONT_B, chan_name(ch), TC(FG), 80);
-    text_fit(x + 8, at_mid(&FONT_T, 12), &FONT_T, synth_preset_name(ch), TC(SUB), 168 - x);
+    x = text_fit(x + 8, at_mid(&FONT_T, 12), &FONT_T, synth_preset_name(ch), TC(SUB), 168 - x);
+    if (synth_sound(ch)->arp_hold || seq_drones(ch)) {   /* (HOLD on, or drones sounding: said) */
+        const char *bd = seq_drones(ch) ? "DRONE" : "HOLD";
+        int32_t bw = text_w(&FONT_T, bd) + 6;
+        if (x + 6 + bw < 180) {
+            rrect(x + 6, 6, bw, 13, 3, TC(REC));
+            cv_text(x + 9, at_mid(&FONT_T, 12), &FONT_T, bd, TC(BG));
+        }
+    }
     for (i = 0; i < NCH; i++) {          /* the six: the selected ringed, each swelling as it strikes */
         uint32_t age = ui.pulse_t[i] ? now - ui.pulse_t[i] : PULSE_MS;
         float r = synth_audible(i) && age < PULSE_MS ? 2.5f + 2.0f * (float)(PULSE_MS - age) / (float)PULSE_MS : 2.5f;
@@ -3702,6 +3779,21 @@ static void draw_foot(uint32_t now)
         title = synth_page_title(ch, ui.page == PG_EDIT2);
     else if (ui.page == PG_HOME && silent_why(ch))   /* LOOP: why the channel is silent, where the title is */
         title = silent_why(ch);
+    else if (ui.page == PG_HOME && ui.loop && song.mode == MODE_SONG && song.nchain && seq_playing()) {
+        static char st[24];              /* LOOP, the song playing: which section ("SONG 3/5 A2") */
+        char n[6];
+        copy_text(st, "SONG ", 24);
+        int_text((int32_t)seq_sect() + 1, n);
+        text_cat(st, n);
+        text_cat(st, "/");
+        int_text((int32_t)song.nchain, n);
+        text_cat(st, n);
+        n[0] = ' ';
+        n[1] = (char)('A' + seq_slot());
+        int_text(song.chain[seq_sect() % NCHAIN].scene + 1, n + 2);
+        text_cat(st, n);
+        title = st;
+    }
     else
         title = PAGE_TITLE[ui.page];
     if (now < ui.msg_until) {
@@ -3866,6 +3958,48 @@ static uint32_t seqview_sig(void)
     return h;
 }
 
+/* SAVE > CHAIN: the song's order as tiles, six a row (A1 A2 A2 A1 A3 ...), each scene's bars under it; the cursor
+ * (STEP) outlined, the section playing filled red, then END: LOOP or STOP. The rows scroll to keep the cursor in view */
+static void draw_chain(uint32_t band)
+{
+    uint32_t i, n = song.nchain, first, cur = ui.cs, play = seq_playing() && song.mode == MODE_SONG ? seq_sect() : 0xFFu;
+    cv_begin(240, 84, TC(BG));
+    cv_oy = -84 * (int32_t)band;
+    cv_y0 = 0;
+    cv_y1 = 84;
+    first = cur / 6u >= 4u ? (cur / 6u - 3u) * 6u : 0u;   /* (four rows shown: the cursor's in them) */
+    for (i = first; i <= n && i < first + 24u; i++) {
+        int32_t x = 8 + 38 * (int32_t)((i - first) % 6u), y = 8 + 40 * (int32_t)((i - first) / 6u);
+        char s[8], bb[8];
+        if (i == n) {                    /* END: what the song does after its last section */
+            rrect(x, y, 34, 34, 4, i == cur ? TC(FG) : TC(PANEL));
+            rrect(x + 2, y + 2, 30, 30, 3, TC(BG));
+            cv_text(x + (34 - text_w(&FONT_T, "END")) / 2, y + 6, &FONT_T, "END", TC(SUB));
+            cv_text(x + (34 - text_w(&FONT_T, seq_chain_end_stop() ? "STOP" : "LOOP")) / 2, y + 19, &FONT_T,
+                    seq_chain_end_stop() ? "STOP" : "LOOP", TC(DIM));
+            break;
+        }
+        rrect(x, y, 34, 34, 4, i == cur ? TC(FG) : i == play ? TC(REC) : TC(PANEL));
+        if (i == cur)
+            rrect(x + 2, y + 2, 30, 30, 3, i == play ? TC(REC) : TC(PANEL));
+        s[0] = (char)('A' + seq_slot());
+        int_text(song.chain[i].scene + 1, s + 1);
+        cv_text(x + (34 - text_w(&FONT_B, s)) / 2, y + 3, &FONT_B, s, i == play ? TC(BG) : TC(FG));
+        int_text(song.chain[i].bars, bb);
+        if (song.chain[i].reps > 1u) {
+            char r[4];
+            int_text(song.chain[i].reps, r);
+            text_cat(bb, "x");
+            text_cat(bb, r);
+        }
+        cv_text(x + (34 - text_w(&FONT_T, bb)) / 2, y + 21, &FONT_T, bb, i == play ? TC(BG) : TC(SUB));
+    }
+    cv_text(8, 150, &FONT_T, n ? "KEYS ADD  F#3 DELETE  G#3 UNDO  A#3 END" : "TAP SCENE KEYS: THE SONG IN ORDER",
+            TC(SUB));
+    cv_oy = 0;
+    cv_blit(0, 26 + 84 * band);
+}
+
 /* NAME: the channel, its eight places (the cursor's in its colour, blinking), what the buttons do */
 static void draw_name(uint32_t band, uint32_t blink)
 {
@@ -3911,6 +4045,8 @@ static void draw_(uint32_t now)
         mode = 3u + GR_N + (ui.page == PG_DGRID);   /* NOTES, DRUMS: their views */
     else if (mode == 0u && ui.page == PG_NAME)
         mode = 9u + GR_N;                /* NAME: the name being edited */
+    else if (mode == 0u && ui.page == PG_CHAIN)
+        mode = 11u + GR_N;               /* CHAIN: the song's order */
     else if (mode == 0u && !ui.loop)
         mode = 10u + GR_N;               /* the channels as PLAY (0: as LOOP) */
     if (ui.theme_drawn != prefs.display || mode != ui.mode_drawn) {   /* another theme or view: everything again */
@@ -3947,6 +4083,7 @@ static void draw_(uint32_t now)
         const sound_t *s = synth_sound(ch);
         char t1[24], t2[24];
         h = sig_str(sig_add(2166136261u, ch << 16 | (uint32_t)s->engine << 8 | s->preset), chan_given(ch));
+        h = sig_add(h, (uint32_t)s->arp_hold << 8 | (uint32_t)seq_drones(ch));
         for (k = 0; k < NCH; k++) {
             uint32_t age = ui.pulse_t[k] ? now - ui.pulse_t[k] : PULSE_MS;
             h = sig_add(h, k << 16 | (uint32_t)synth_audible(k) << 8 | (age < PULSE_MS ? age / 30u : 99u));
@@ -3966,6 +4103,16 @@ static void draw_(uint32_t now)
             anim_step(ch, now);          /* (the frame's sound and dots once, then each band) */
             for (k = 0; k < 2u; k++)
                 draw_play_anim(k, now);
+        }
+    } else if (mode == 11u + GR_N) {
+        h = sig_add(2166136261u, song.nchain << 16 | ui.cs << 8 | (uint32_t)seq_chain_end_stop());
+        h = sig_add(h, seq_playing() && song.mode == MODE_SONG ? seq_sect() : 0xFFu);
+        for (i = 0; i < song.nchain; i++)
+            h = sig_add(h, (uint32_t)song.chain[i].scene << 16 | (uint32_t)song.chain[i].bars << 8 | song.chain[i].reps);
+        if (h != ui.sig_row[0]) {
+            ui.sig_row[0] = h;
+            for (i = 0; i < 2u; i++)
+                draw_chain(i);
         }
     } else if (mode == 9u + GR_N) {
         h = sig_str(sig_add(2166136261u, (uint32_t)ui.name_ch << 8 | ui.name_cur), ui.name);
@@ -4035,6 +4182,9 @@ static void draw_(uint32_t now)
         h = sig_add(sig_str(sig_str(h, t), kn_label(kn[i])), v);
     }
     h = sig_add(h, synth_sound(set.channel)->engine);
+    h = sig_add(h, (uint32_t)(song.mode == MODE_SONG && seq_playing()) << 16 | seq_sect() << 8 | ui.loop);
+    if (silent_why(set.channel))
+        h = sig_str(h, silent_why(set.channel));
     if (h != ui.sig_foot) {
         ui.sig_foot = h;
         draw_foot(now);
@@ -4091,6 +4241,32 @@ void app_frame(void)
     uint32_t i, now = plat_ms();
     if (factory_step())                  /* (a factory reset under way: nothing else, the ring filling) */
         return;
+    {                                    /* a note left on: a voice held whose key is up, nothing else holding it (the
+                                          * sequencer stopped, no arp, no MIDI notes for 5 s): let go, once a second */
+        static uint32_t sweep_t;
+        if (now - sweep_t >= 1000u && !seq_playing() && (!midi_note_t || now - midi_note_t > 5000u)) {
+            uint32_t ch;
+            sweep_t = now;
+            for (ch = 0; ch < NCH; ch++) {
+                synth_vview_t vv[SYN_VMAX];
+                uint32_t n, j, k, q;
+                if (seq_arp_on(ch) || maps_keys(ch) || sus_on[ch] || (pv.note >= 0 && pv.ch == ch))
+                    continue;
+                n = synth_voice_view(ch, vv);
+                for (j = 0; j < n; j++) {
+                    int held = 0;
+                    if (!vv[j].gate)
+                        continue;
+                    for (k = 0; k < NKEYS && !held; k++)
+                        for (q = 0; q < 5u && !held; q++)
+                            held = ui.key_ch[k] == ch && ui.key_note[k][q] >= 0
+                                   && clamp(ui.key_note[k][q] + song.transpose, 0, 127) == (int32_t)vv[j].note;
+                    if (!held && now - ui.input_t > 1000u)
+                        synth_note_off(ch, vv[j].note);
+                }
+            }
+        }
+    }
     if (ui.fr_hold) {                    /* FACTORY RESET: PLAY held; let go early, nothing happens */
         if (!(ui.btn >> B_PLAY & 1u)) {
             ui.fr_hold = ui.fr_arm = 0;

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 nullwave contributors
-"""The quick start page (nullwave.cc/fm1/quick-start/) from docs/QUICK-START.md: eight steps, each the FM-1 drawn in
+"""The quick start page (nullwave.cc/fm1/quick-start/) from docs/QUICK-START.md: nine steps, each the FM-1 drawn in
 lines with what to press lit (the site's device.js), the screen you get (docs/img/quick, HD: tools/hd_shots.py), two
 lines. tools/site_look.py then gives it the site's nav, footer and stylesheet.
 
@@ -143,14 +143,14 @@ def page(steps, version):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quick start · nullwave fm1</title>
-<meta name="description" content="nullwave fm1 in eight steps: switch on, play, change the sound, scales and chords, record a loop, drums, scenes, settings.">
+<meta name="description" content="nullwave fm1 in nine steps: switch on, play, change the sound, scales and chords, record a loop, drums, scenes, a song in order, settings.">
 <meta name="color-scheme" content="dark light">
 <style>{CSS}</style>
 </head>
 <body>
 <header class="wrap qs-hero"><div class="kicker"><b>●</b> Version {html.escape(version)}</div>
 <h1>Quick start</h1>
-<p class="lead">Eight steps, from switching on to launching scenes. The drawing lights what to press; the screen shows
+<p class="lead">Nine steps, from switching on to a song in order. The drawing lights what to press; the screen shows
 what you get.</p>
 <ol class="qs-steps">{nav}</ol></header>
 {"".join(body)}
