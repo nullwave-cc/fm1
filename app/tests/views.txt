@@ -1,0 +1,88 @@
+# MAIN's two views: PLAY (the default: the selected channel drawn alive, its engine's knobs) and LOOP (four channels
+# with their steps); SHIFT + HOME switches; REC puts LOOP up while it lasts; SETTINGS > SCREEN 2: HOME VIEW, AUTO LOOP
+wait 1800
+expect view 0
+expect page 0
+# PLAY's knobs are the engine's EDIT 1: KNOB 1 turns ANALOG's WAVE
+listen
+turn K1 1
+said WAVE SQR
+# the four shown follow the selected channel
+expect prow 0
+turn ALGO 5
+expect prow 2
+turn ALGO 1
+expect prow 0
+# SHIFT + HOME: LOOP, and back
+press OCT-
+wait 30
+tap HOME
+wait 30
+release OCT-
+wait 30
+expect view 1
+expect octave 0
+press OCT-
+wait 30
+tap HOME
+wait 30
+release OCT-
+wait 30
+expect view 0
+# REC armed: LOOP while it lasts, PLAY again after
+tap REC
+wait 50
+expect view 1
+tap REC
+wait 50
+expect view 0
+# playing: LOOP too; SHIFT + HOME meanwhile keeps PLAY till it stops
+tap PLAY
+wait 100
+expect view 1
+press OCT-
+wait 30
+tap HOME
+wait 30
+release OCT-
+wait 100
+expect view 0
+tap PLAY
+wait 100
+expect view 0
+tap PLAY
+wait 100
+expect view 1
+tap PLAY
+wait 100
+expect view 0
+# SETTINGS > SCREEN 2 (the second page of SCREEN): HOME VIEW LOOP, AUTO LOOP OFF
+press HOME
+wait 800
+release HOME
+wait 30
+turn SELECT 1
+wait 30
+expect page 58
+turn K1 1
+expect view 1
+turn K2 -1
+press HOME
+wait 800
+release HOME
+wait 30
+press OCT-
+wait 30
+tap HOME
+wait 30
+release OCT-
+wait 30
+expect view 0
+tap REC
+wait 50
+expect view 0
+tap REC
+wait 3500
+reboot
+wait 1800
+expect view 1

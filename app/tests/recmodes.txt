@@ -1,6 +1,6 @@
 # Recording: clear (EDIT + REC at once, REC held 2 s), undone with EDIT + OCT-; REC MODE OVERDUB / REPLACE (SHIFT + REC,
 # SETTINGS > SEQ); the SEQ layer's bar (SELECT); HOME's light on MAIN
-wait 900
+wait 1800
 expect home_lit 1
 tap ENV
 wait 50

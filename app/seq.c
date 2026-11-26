@@ -47,6 +47,12 @@ static int16_t take_open[128];
 static pat_t undo_buf PLAT_POOL;
 static uint8_t undo_ch, undo_pi, undo_ok, redo_ok;
 
+/* REPLACE: one pattern, no copy. The notes the pass records are marked EV_NEW; the others (the last full take) are
+ * silent while it records. A full pass done: the old ones go, the new ones are the take. Stopped short: the new ones
+ * go, the take is as it was. (The undo before the recording is the general one, undo_take: no copy of its own.) */
+static uint32_t rp_ticks;                /* ticks of the pass under way */
+static uint8_t rp_kept;                  /* a pass stopped short: said once */
+
 static const uint16_t DIV_TICKS[NDIV] = {24, 48, 12, 16, 96, 32, 192, 384, 768};
 static const uint8_t DIV_ORDER[NDIV] = {DIV_32, DIV_16T, DIV_16, DIV_8T, DIV_8, DIV_4, DIV_2, DIV_1BAR, DIV_2BAR};
 
@@ -114,6 +120,56 @@ int seq_redo(void)
     undo_ok = 1;
     redo_ok = 0;
     return 1;
+}
+
+static void rp_settle(int keep_new)       /* the REPLACE pass ends: the new notes are the take (1) or go (0) */
+{
+    pat_t *p = seq_pat(rec_ch);
+    uint32_t i, j = 0, k;
+    int16_t to[PAT_EV];                  /* (each note's new place, for the notes still held) */
+    for (i = 0; i < p->n; i++) {
+        ev_t e = p->ev[i];
+        to[i] = -1;
+        if (((e.fl & EV_NEW) != 0) == !!keep_new) {
+            e.fl &= (uint8_t)~EV_NEW;
+            to[i] = (int16_t)j;
+            p->ev[j++] = e;
+        }
+    }
+    p->n = (uint8_t)j;
+    for (k = 0; k < 128u; k++)
+        if (open_n[rec_ch][k].idx >= 0)
+            open_n[rec_ch][k].idx = open_n[rec_ch][k].idx < (int16_t)PAT_EV ? to[open_n[rec_ch][k].idx] : -1;
+    rp_ticks = 0;
+}
+
+static void rec_ends(void)               /* REC_ON is over: a REPLACE pass not complete leaves the last take */
+{
+    if (rec == REC_ON && seq_cfg.rec_replace) {
+        int short_pass = rp_ticks != 0u;
+        rp_settle(0);
+        if (short_pass)
+            rp_kept = 1;
+    }
+}
+
+int seq_take_kept(void)
+{
+    int k = rp_kept;
+    rp_kept = 0;
+    return k;
+}
+
+void seq_replace_changed(void)           /* REC MODE turned while recording */
+{
+    uint32_t f = lock_(), i;
+    if (rec == REC_ON && !seq_cfg.rec_replace) {   /* to OVERDUB: what this pass has is added to the take */
+        pat_t *p = seq_pat(rec_ch);
+        for (i = 0; i < p->n; i++)
+            p->ev[i].fl &= (uint8_t)~EV_NEW;
+    }
+    rp_ticks = 0;                        /* (to REPLACE: a pass starts here) */
+    unlock_(f);
 }
 
 static void ev_del(pat_t *p, uint32_t i)
@@ -504,13 +560,21 @@ static void sounds_keep(void)
 {
     uint32_t ch;
     scene_t *sc = &song.scene[cur_scene];
-    for (ch = 0; ch < NCH; ch++)
+    for (ch = 0; ch < NCH; ch++) {
         memcpy(song.fm6[ch], synth_fm6_own(ch), SYN_FM6_BYTES);
+        song.mod[ch] = *synth_mod(ch);
+    }
     for (ch = 0; ch < NCH; ch++) {
         if (sc->has_sound)
             sc->snd[ch] = *synth_sound(ch);
-        else
+        else {
+            uint32_t k;
+            const char *nm = synth_own_name(ch);
             song.snd[ch] = *synth_sound(ch);
+            memset(song.sname[ch], 0, SYN_NAME);   /* (its own name with it: a scene's sounds have none) */
+            for (k = 0; k < SYN_NAME && nm[k]; k++)
+                song.sname[ch][k] = nm[k];
+        }
     }
 }
 
@@ -519,14 +583,20 @@ static void scene_apply(uint32_t s, uint32_t t)
     uint32_t ch, had = song.scene[cur_scene].has_sound;
     scene_t *sc = &song.scene[s % NSCENE];
     sounds_keep();
+    if (rec == REC_ON && seq_cfg.rec_replace && s % NSCENE != cur_scene) {
+        rec_ends();                      /* (another scene: the REPLACE pass stops there) */
+        rec = REC_OFF;
+    }
     cur_scene = (uint8_t)(s % NSCENE);
     for (ch = 0; ch < NCH; ch++) {
         pstart[ch] = t;
         synth_set_level(ch, sc->level[ch]);
         if (sc->has_sound)
             synth_set_sound(ch, &sc->snd[ch]);
-        else if (had)
+        else if (had) {
             synth_set_sound(ch, &song.snd[ch]);
+            synth_set_name(ch, song.sname[ch], SYN_NAME);
+        }
         synth_unlock(ch);
     }
     synth_mute(sc->mute);
@@ -946,14 +1016,14 @@ static void channel_tick(uint32_t ch, uint32_t t)
             e->fl &= (uint8_t)~EV_SKIP;
             continue;
         }
+        if (seq_cfg.rec_replace && rec == REC_ON && ch == rec_ch && !(e->fl & EV_NEW))
+            continue;                    /* REPLACE recording: the last take silent (kept till the pass is full) */
         if (e->fl & EV_LOCK) {
             synth_lock(ch, e->note, (int32_t)e->vel - 128);
             pend_add(t + st, PD_UNLOCK, ch, 0, 0, 0);
             continue;
         }
-        if ((erase_note[ch] >= 0 && e->note == (uint32_t)erase_note[ch])   /* EDIT held on the key: erased */
-            || (seq_cfg.rec_replace && rec == REC_ON && ch == rec_ch)) {      /* REPLACE: what was there goes as
-                                                                               * the playhead passes, recording */
+        if (erase_note[ch] >= 0 && e->note == (uint32_t)erase_note[ch]) {   /* EDIT held on the key: erased */
             ev_del(p, i);
             i--;
             dirty_f = 1;
@@ -996,6 +1066,8 @@ static void song_section_start(uint32_t i, uint32_t t)
 static void tick_run(uint32_t t)
 {
     uint32_t ch;
+    if (rec == REC_ON && seq_cfg.rec_replace && ++rp_ticks >= pat_len(seq_pat(rec_ch)))
+        rp_settle(1);                    /* REPLACE: a full pass, the new notes the take */
     if (t % TBAR == 0u && t)
         bars_played++;
     if (t % TBAR == 0u) {                /* GLO key 10: the next bar a fill */
@@ -1070,6 +1142,7 @@ void seq_play(void)
         if (rec == REC_ARMED) {
             rec = REC_ON;
             undo_take(rec_ch);
+            rp_ticks = 0;
             if (!seq_pat(rec_ch)->n)
                 seq_pat(rec_ch)->bars = seq_cfg.rec_bars;
         }
@@ -1089,6 +1162,7 @@ void seq_stop(void)
     pend_flush();
     queued = -1;
     count_t = -1;
+    rec_ends();
     if (rec == REC_ON || rec == REC_COUNT)
         rec = REC_OFF;
     unlock_(f);
@@ -1152,6 +1226,7 @@ void seq_rec_button(uint32_t ch)
         if (playing) {
             rec = REC_ON;
             undo_take(ch);
+            rp_ticks = 0;
         } else {
             rec = REC_ARMED;
         }
@@ -1165,13 +1240,20 @@ void seq_rec_button(uint32_t ch)
         take_close();
         break;
     default:
+        rec_ends();
         rec = REC_OFF;                   /* recording stops, the loop plays on */
         break;
     }
     unlock_(f);
 }
 
-void seq_rec_off(void) { rec = REC_OFF; }
+void seq_rec_off(void)
+{
+    uint32_t f = lock_();
+    rec_ends();
+    rec = REC_OFF;
+    unlock_(f);
+}
 
 /* a note recorded at the playhead: on the step (QUANT) or where it fell (the offset kept) */
 static void rec_insert(uint32_t ch, uint32_t note, uint32_t vel)
@@ -1184,6 +1266,8 @@ static void rec_insert(uint32_t ch, uint32_t note, uint32_t vel)
         if (pos != now)
             fl = EV_SKIP;                /* ahead of the playhead: it would sound again at once */
     }
+    if (seq_cfg.rec_replace)
+        fl |= EV_NEW;                    /* (this pass's: the take once the pass is full) */
     i = ev_add(p, pos, note, vel, st / 6u, fl);
     if (i >= 0) {
         open_n[ch][note & 127u].idx = (int16_t)i;
@@ -1206,6 +1290,7 @@ void seq_note_on(uint32_t ch, uint32_t note, uint32_t vel)
             seq_pat(ch)->bars = (uint8_t)(seq_pat(ch)->n ? seq_pat(ch)->bars : seq_cfg.rec_bars);
             undo_take(ch);
             rec = REC_ON;
+            rp_ticks = 0;
             start_at_zero();
         }
     }
@@ -1349,6 +1434,7 @@ void seq_render(uint32_t n)
             count_t = -1;
             rec = REC_ON;
             undo_take(rec_ch);
+            rp_ticks = 0;
             if (!seq_pat(rec_ch)->n)
                 seq_pat(rec_ch)->bars = seq_cfg.rec_bars;
             start_at_zero();
@@ -1389,7 +1475,8 @@ void seq_render(uint32_t n)
 #define SONG_BASE 0x97000u
 #define SONG_SIZE 0x8000u                /* eight sectors a song */
 #define SONG_MAGIC 0x4E575347u           /* "NWSG" */
-#define SONG_VER 3u
+#define SONG_VER 5u                      /* 4: the channels' names (a 3 loads with none); 5: their modulation and their
+                                          * sounds' own names (a 3 or 4 loads with the defaults, the presets' names) */
 #define SONG_HEAD 16u
 
 uint32_t seq_slot(void) { return slot; }
@@ -1478,24 +1565,26 @@ int seq_save(uint32_t s)
     return 0;
 }
 
-static const uint8_t *slot_data(uint32_t s, uint32_t *size)
+static const uint8_t *slot_data(uint32_t s, uint32_t *size, uint32_t *ver)
 {
     const uint8_t *d = plat_data(SONG_BASE + (s % NSONG) * SONG_SIZE);
     uint32_t head[4];
     if (!d)
         return 0;
     memcpy(head, d, sizeof head);
-    if (head[0] != SONG_MAGIC || head[1] != SONG_VER || head[2] < SONG_HEAD || head[2] > SONG_SIZE
+    if (head[0] != SONG_MAGIC || head[1] < 3u || head[1] > SONG_VER || head[2] < SONG_HEAD || head[2] > SONG_SIZE
         || crc32_add(0, d + SONG_HEAD, head[2] - SONG_HEAD) != head[3])
         return 0;
     *size = head[2];
+    if (ver)
+        *ver = head[1];
     return d;
 }
 
 int seq_slot_used(uint32_t s)
 {
     uint32_t n;
-    return slot_data(s, &n) != 0;
+    return slot_data(s, &n, 0) != 0;
 }
 
 static void song_defaults(void)
@@ -1511,6 +1600,9 @@ static void song_defaults(void)
     song.mst[MST_ROLL] = 1;
     for (i = 0; i < FX_N; i++)
         song.fx[i] = (int16_t)synth_fx(i);
+    memcpy(song.name[NCH - 1], "DRUMS", 5);   /* (the kit: the last channel, synth.c DEF_ENG) */
+    for (ch = 0; ch < NCH; ch++)
+        synth_default_mod(&song.mod[ch]);
     for (ch = 0; ch < NCH; ch++) {
         synth_default_sound(ch, &song.snd[ch]);
         for (i = 0; i < NPAT; i++)
@@ -1534,11 +1626,16 @@ static void song_start(void)             /* the song in RAM to the synth, from i
         if (i != MST_RESO)
             synth_master_set(i, song.mst[i]);
     synth_tempo(song.bpm10);
-    for (ch = 0; ch < NCH; ch++)
+    for (ch = 0; ch < NCH; ch++) {
         memcpy(synth_fm6_own(ch), song.fm6[ch], SYN_FM6_BYTES);
+        synth_set_mod(ch, &song.mod[ch]);
+    }
     cur_scene = 0;
-    for (ch = 0; ch < NCH; ch++)
+    for (ch = 0; ch < NCH; ch++) {
         synth_set_sound(ch, song.scene[0].has_sound ? &song.scene[0].snd[ch] : &song.snd[ch]);
+        if (!song.scene[0].has_sound)
+            synth_set_name(ch, song.sname[ch], SYN_NAME);
+    }
     {
         scene_t *sc = &song.scene[0];
         for (ch = 0; ch < NCH; ch++)
@@ -1561,15 +1658,37 @@ void seq_new(void)
 
 int seq_load(uint32_t s)
 {
-    uint32_t size, at, ch, i, f, fixed = (uint32_t)((const uint8_t *)&song.pat - (const uint8_t *)&song.bpm10);
-    const uint8_t *d = slot_data(s, &size);
+    uint32_t size, at, ch, i, f, ver = 0, fixed = (uint32_t)((const uint8_t *)&song.pat - (const uint8_t *)&song.bpm10);
+    const uint8_t *d = slot_data(s, &size, &ver);
     if (!d)
         return -1;
+    if (ver < 5u)                        /* (a song from before the modulation, or the names: the same, less them) */
+        fixed -= (uint32_t)(sizeof song.mod + sizeof song.sname);
+    if (ver < 4u)
+        fixed -= (uint32_t)sizeof song.name;
     f = lock_();
     song_defaults();
     at = SONG_HEAD;
     memcpy(&song.bpm10, d + at, fixed);
     at += fixed;
+    if (ver < 4u)
+        memset(song.name, 0, sizeof song.name);
+    for (ch = 0; ch < NCH; ch++) {       /* the modulation checked (else the default), the sounds' names (else none) */
+        if (ver < 5u || !synth_mod_ok(&song.mod[ch]))
+            synth_default_mod(&song.mod[ch]);
+        if (ver < 5u || !((song.sname[ch][0] >= 'A' && song.sname[ch][0] <= 'Z')
+                          || (song.sname[ch][0] >= '0' && song.sname[ch][0] <= '9')))
+            memset(song.sname[ch], 0, SYN_NAME);
+    }
+    for (ch = 0; ch < NCH; ch++)         /* a name's characters checked (else none) */
+        for (i = 0; i < SONG_NAME; i++) {
+            char c = song.name[ch][i];
+            if (c && !(c == ' ' || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '.' || c == '/'
+                       || c == '+' || c == '#' || c == '&' || c == '!')) {
+                memset(song.name[ch], 0, SONG_NAME);
+                break;
+            }
+        }
     for (ch = 0; ch < NCH && at + 4u <= size; ch++)
         for (i = 0; i < NPAT && at + 4u <= size; i++) {
             pat_t *p = &song.pat[ch][i];

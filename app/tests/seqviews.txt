@@ -1,7 +1,6 @@
 # The SEQ pages: NOTES (a piano roll) on a synth channel, DRUMS (the kit's lanes on steps) on the kit; the full DIV list
 wait 900
-turn ALGO 1
-# a line recorded on channel 2
+# a line recorded on channel 1
 tap REC
 key 0 down 100
 wait 150
@@ -35,7 +34,7 @@ tap SEQ
 tap SEQ
 turn K2 10
 wait 30
-# the kit on channel 1: DRUMS
+# the kit on channel 6: DRUMS
 turn ALGO -1
 tap HOME
 tap SEQ
@@ -55,23 +54,3 @@ tap PLAY
 wait 500
 shot seq-drums.png
 tap PLAY
-# the visualiser: HOME tapped again on MAIN, round its styles (a kit and a synth sounding)
-tap HOME
-tap HOME
-wait 30
-midi 90 24 7F
-midi 91 3C 64
-wait 80
-shot vis-bars.png
-tap HOME
-midi 90 26 7F
-wait 80
-shot vis-rings.png
-tap HOME
-turn ALGO 1
-wait 120
-shot vis-scope.png
-midi 81 3C 00
-tap HOME
-wait 100
-shot vis-off.png

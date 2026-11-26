@@ -1,0 +1,41 @@
+# Every key plays a note when the keys follow the scale: SNAP (a key off the scale: the scale's note below it) and
+# WHITE (C4 the root, the white keys the scale; a black key the note of the white key below it). With a CHORD on, the
+# black keys are CHORD+'s and play nothing themselves
+wait 1800
+tap SEL
+wait 30
+turn K2 2
+turn K3 1
+tap HOME
+wait 50
+# SNAP, C minor: C#4 (key 8) plays C4, F#3 (key 1) plays F3
+key 8 down 100
+wait 30
+expect note 60
+key 8 up
+key 1 down 100
+wait 30
+expect note 53
+key 1 up
+# WHITE: C4 the root; C#4 plays C4 too, D#4 (key 10) plays D4, F#3 (key 1) the F3 of the white key below it
+tap SEL
+wait 30
+turn K3 1
+tap HOME
+wait 50
+key 7 down 100
+wait 30
+expect note 60
+key 7 up
+key 8 down 100
+wait 30
+expect note 60
+key 8 up
+key 10 down 100
+wait 30
+expect note 62
+key 10 up
+key 1 down 100
+wait 30
+expect note 53
+key 1 up

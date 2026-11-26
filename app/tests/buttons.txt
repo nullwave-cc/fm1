@@ -1,32 +1,28 @@
 # The buttons: a press that chatters on both edges (a contact bouncing for a few ms) is one press; a tap acts once,
 # on release; a hold acts once when its time comes and its release does nothing; PLAY acts once, on press
 wait 900
-# HOME tapped on MAIN, chattering: the visualiser one step (BARS), not two
-press HOME
+# ENV tapped, chattering: its first page (ENV), not the next one
+press ENV
 wait 2
-release HOME
+release ENV
 wait 3
-press HOME
+press ENV
 wait 2
-release HOME
+release ENV
 wait 2
-press HOME
+press ENV
 wait 60
-release HOME
+release ENV
 wait 2
-press HOME
+press ENV
 wait 3
-release HOME
+release ENV
 wait 100
-expect vis 1
+expect page 1
 expect list 0
 tap HOME
 wait 50
-tap HOME
-wait 50
-tap HOME
-wait 50
-expect vis 0
+expect page 0
 # HOME held, chattering at both ends: SETTINGS opens once, its release does nothing
 press HOME
 wait 3

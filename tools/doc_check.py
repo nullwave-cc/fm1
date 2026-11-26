@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: MPL-2.0
 # Copyright (C) 2026 nullwave contributors
 """Does the manual name everything the firmware shows? Every page title a button opens, every knob label on a page,
-a layer or SETTINGS, and every sound parameter's label must appear in app/docs/MANUAL.md; prints what is missing.
+a layer or SETTINGS, and every sound parameter's label must appear in app/docs/MANUAL.md. And does the quick start
+(docs/QUICK-START.md) hold together: each control it lights is one the site's drawing knows, each screen one of the
+promo set's (docs/img/promo), each name in capitals one the manual explains. Prints what is wrong.
 
     python3 tools/doc_check.py        (exit 1 if anything is missing)
 """
@@ -45,4 +47,23 @@ missing = sorted(t for t in need if not re.search(r"(?<![A-Z0-9])" + re.escape(t
 for t in missing:
     print(f"not in the manual: {t!r} ({need[t]})")
 print(f"doc_check: {len(need)} names, {len(missing)} missing")
-sys.exit(1 if missing else 0)
+
+# the quick start
+GROUPS = {"KEYS", "KNOBS", "MASTER", "SELECT", "PRESETS", "ALGORITHM", "KNOB1", "KNOB2", "KNOB3", "KNOB4", "OCT-",
+          "OCT+", "SHIFT", "FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ", "PLAY STOP", "PLAY",
+          "STOP", "REC", "BUTTONS", "SCREEN"}   # (the site's device.js, its DESIGN.md)
+quick = (ROOT / "docs" / "QUICK-START.md").read_text()
+wrong = []
+for g in re.findall(r"^press: (.*)$", quick, re.M):
+    wrong += [f"control {c!r}" for grp in g.split("|") for c in (x.strip() for x in grp.split(",")) if c not in GROUPS]
+for sc in re.findall(r"^screen: (.*)$", quick, re.M):
+    if sc.strip() != "@splash" and not (ROOT / "docs" / "img" / "promo" / f"{sc.strip()}-dark.webp").exists():
+        wrong.append(f"screen {sc.strip()!r} (not in docs/img/promo)")
+text = "\n".join(ln for ln in quick.split("## ", 1)[1].splitlines() if not ln.startswith(("press:", "screen:", "#")))
+for w in sorted(set(re.findall(r"\b[A-Z][A-Z0-9]{2,}\b", text)) - {"USB", "MIDI"}):
+    if not re.search(r"(?<![A-Z0-9])" + re.escape(w) + r"(?![A-Z0-9])", manual):
+        wrong.append(f"name {w!r} (not in the manual)")
+for t in wrong:
+    print(f"quick start: {t}")
+print(f"doc_check: the quick start, {len(wrong)} wrong")
+sys.exit(1 if missing or wrong else 0)

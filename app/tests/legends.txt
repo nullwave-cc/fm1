@@ -1,0 +1,95 @@
+# EDIT held, the black keys by the panel's legends: OP1..OP6 (FM6: the operator's page; held 0.5 s: it muted), PIT the
+# PITCH page, GLO the glide, MONO and POLY the voice mode; on a kit, the lane mutes stay
+wait 900
+turn ALGO 1
+expect engine 1
+# OP3 tapped: OPERATOR page, operator 3
+press EDIT
+wait 30
+key 5 down 100
+wait 30
+key 5 up
+wait 30
+release EDIT
+wait 50
+expect page 40
+expect fm_op 2
+shot legend-op3.png
+tap HOME
+wait 50
+# OP1 held 0.6 s: operator 1 muted (the sound quieter), again: back
+peakreset
+press EDIT
+wait 30
+key 1 down 100
+wait 600
+key 1 up
+wait 30
+release EDIT
+wait 30
+expect fm_mutes 1
+press EDIT
+wait 30
+key 1 down 100
+wait 600
+key 1 up
+wait 30
+release EDIT
+wait 30
+expect fm_mutes 0
+# MONO, POLY
+press EDIT
+wait 30
+key 20 down 100
+wait 30
+key 20 up
+wait 30
+expect mono 1
+key 22 down 100
+wait 30
+key 22 up
+wait 30
+expect mono 0
+release EDIT
+wait 30
+# GLO: the glide on, the PITCH page; again: off
+press EDIT
+wait 30
+key 17 down 100
+wait 30
+key 17 up
+wait 30
+release EDIT
+wait 50
+expect glide >0
+expect page 56
+shot legend-pitch.png
+press EDIT
+wait 30
+key 17 down 100
+wait 30
+key 17 up
+wait 30
+release EDIT
+wait 30
+expect glide 0
+# PIT on ANALOG: the PITCH page; OP1 on ANALOG: EDIT 1
+turn ALGO -1
+press EDIT
+wait 30
+key 15 down 100
+wait 30
+key 15 up
+wait 30
+release EDIT
+wait 50
+expect page 56
+press EDIT
+wait 30
+key 1 down 100
+wait 30
+key 1 up
+wait 30
+release EDIT
+wait 50
+expect page 8

@@ -1,0 +1,58 @@
+# HOME held at power-on: the settings and preferences back to their defaults, the songs kept (app.c app_boot); HOME
+# ignored till let go (no SETTINGS screen). Run by tests/run_tests.sh:
+#   app/build/host/nullwave_host app/tests/settings_reset.txt app/build/host
+wait 1800
+# an octave up, HOME VIEW LOOP, TRANS -3 and the song saved
+tap OCT+
+wait 30
+expect octave 1
+press HOME
+wait 900
+release HOME
+wait 50
+turn SELECT 1
+wait 30
+turn K1 1
+wait 30
+expect home_view 1
+press HOME
+wait 900
+release HOME
+wait 50
+press SEL
+wait 600
+turn K4 -3
+wait 30
+release SEL
+wait 30
+expect transpose -3
+tap SAVE
+wait 30
+tap SAVE
+wait 30
+tap SAVE
+wait 300
+wait 2500
+# a power-on: all kept
+reboot
+wait 1800
+expect octave 1
+expect home_view 1
+expect transpose -3
+# HOME held at power-on: the settings reset, the song as it was
+press HOME
+reboot
+wait 1500
+release HOME
+wait 300
+expect octave 0
+expect home_view 0
+expect transpose -3
+expect page 0
+expect view 0
+# and so after the next power-on
+reboot
+wait 1800
+expect octave 0
+expect home_view 0
+expect transpose -3

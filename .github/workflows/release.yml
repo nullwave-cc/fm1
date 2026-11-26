@@ -1,141 +1,74 @@
 # SPDX-License-Identifier: MPL-2.0
-# A firmware's release: built from source on GitHub by the shared FM-1 builder, its packages signed with build
-# provenance, so the FM-1 Firmware Hub shows them as built from source. From fm1-base's template, as LOOM-8's;
-# after X0X's (charlesvestal/fm1-x0x#25, by Kerem Kilic) and Melodee's (keremimo/melodee 4f5fb6d).
-#
-# For a firmware laid out as fm1-base's template expects (the app in app/, fm1-base in base/ with felucca-bsp in
-# base/bsp/, ./build.sh running base/tools/build.py app, tests/run_tests.sh). Move this file to the repository's
-# root, as .github/workflows/release.yml. The lines a firmware changes are marked "# <- yours":
-#   - the concurrency group and the release title: the firmware's name (TEMPLATE)
-#   - pkg=nullwave, twice (build and test): fm1.toml's name in lower case, which names the build's files
-#     (app/build/template.fwsc, template-X.Y.fwsc, template.bin, template-X.Y.rfm1)
-#   - any other assets beside the package, the app, the .rfm1 and firmware.json (LOOM-8's resource region, CTL-1's
-#     build without Bluetooth)
-#   - the tests: anything they need beside this repository (reference sources at fixed commits), or tests-block
-name: Build and attest firmware
+# A release: a version tag (v0.1.0) builds the package (nullwave-0.1.0.fwsc) and the site's FM-1 pages (the installer,
+# the emulator, the quick start, the manual) and makes a draft GitHub release with both and the CHANGELOG's entry for
+# that version. Nothing is published: the draft waits for review, and the pages go to nullwave.cc by docs/PUBLISH.md.
+name: Release
 
 on:
   push:
     tags: ['v[0-9]*']
-  workflow_dispatch:
 
 permissions:
-  contents: read
-
-concurrency:
-  group: nullwave-release-${{ github.ref }}             # <- yours
-  cancel-in-progress: false
+  contents: write
 
 jobs:
-  prepare:
+  release:
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write
     steps:
-      - name: Prepare a draft without replacing a public release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TITLE: nullwave                                  # <- yours
-        run: |
-          set -euo pipefail
-          if [[ "$GITHUB_REF" != refs/tags/* ]]; then exit 0; fi
-          version=${GITHUB_REF_NAME#v}
-          # (the versions base/tools/build.py --release takes)
-          [[ "$version" =~ ^[0-9]{1,2}\.[0-9]{1,2}(\.[0-9]{1,2})?(-[A-Za-z0-9]+)?$ ]]
-          flags=(--prerelease=false)
-          if [[ "$version" == *-* ]]; then flags=(--prerelease --latest=false); fi
-          if draft=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft); then
-            [[ "$draft" == true ]] || { echo 'Refusing to rebuild a public release'; exit 1; }
-          else
-            gh release create "$GITHUB_REF_NAME" --verify-tag --draft \
-              --title "$TITLE $version" --generate-notes "${flags[@]}"
-          fi
-
-  firmware:
-    needs: prepare
-    # The Firmware Hub recognises attestations from this reviewed builder tag.
-    uses: zvenson/fm1-build/.github/workflows/build.yml@v1
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
-    with:
-      sdk: true
-      tests-block: true
-      build: |
-        set -euo pipefail
-        pkg=nullwave                                       # <- yours
-        # the builder checks out without submodules: fm1-base (base/) and its felucca-bsp (base/bsp/), at the
-        # commits this one links
-        git submodule update --init --recursive
-        # the fonts' OpenType features (base/tools/gen_font.py): Pillow's raqm, which loads the system's FriBiDi
-        sudo apt-get install -y -qq libfribidi0
-        python3 -c "from PIL import features; assert features.check('raqm'), 'Pillow without raqm'"
-        test "$(git -C "$AC79_SDK" rev-parse HEAD)" = d179b4484759423312073f5fbb232501aa491047
-        # Emscripten for the .rfm1 (host apps: RemoteFM1), a fixed version from emsdk at a fixed commit
-        git clone -q https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
-        git -C "$RUNNER_TEMP/emsdk" checkout -q a2b92777574c2feda07994cd4f1079a3dfc151f8   # emsdk 6.0.10
-        "$RUNNER_TEMP/emsdk/emsdk" install 6.0.10
-        "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.10
-        set +u; source "$RUNNER_TEMP/emsdk/emsdk_env.sh"; set -u
-        emcc --version
-        mkdir -p build/release-assets
-        if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-          version=${GITHUB_REF_NAME#v}
-          ./build.sh --release "$version"
-          cp "app/build/$pkg-$version.fwsc" build/release-assets/
-          cp "app/build/$pkg.bin" "build/release-assets/$pkg-$version-app.bin"
-          # (the tests check the update path against app/build/$pkg.fwsc: there, the release package itself)
-          cp "app/build/$pkg-$version.fwsc" "app/build/$pkg.fwsc"
-          # the app for host apps (base/README.md, .rfm1)
-          ./build.sh --rfm1 --release "$version"
-          cp "app/build/$pkg-$version.rfm1" build/release-assets/
-        else
-          ./build.sh
-          cp "app/build/$pkg.fwsc" build/release-assets/
-          cp "app/build/$pkg.bin" "build/release-assets/$pkg-app.bin"
-          ./build.sh --rfm1
-          cp app/build/rfm1/"$pkg"-dev+*.rfm1 "build/release-assets/$pkg.rfm1"
-        fi
-        # the firmware described for hubs (base/docs/FIRMWARE-JSON.md), from the build with Bluetooth
-        cp app/build/firmware.json build/release-assets/
-        # <- yours: any other assets, into build/release-assets/
-      test: |
-        set -euo pipefail
-        pkg=nullwave                                       # <- yours
-        [ -f "app/build/$pkg.fwsc" ]
-        # <- yours: anything the tests need beside this repository, fetched at fixed commits
-        sh tests/run_tests.sh
-      packages: build/release-assets/*
-
-  verify:
-    needs: firmware
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-      attestations: read
-    steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          name: packages
-          path: build/attested
-      - name: Verify checksums and signed source provenance
-        working-directory: build/attested
+          submodules: recursive
+      - name: Version
+        run: |
+          set -eu
+          v="${GITHUB_REF_NAME#v}"
+          printf '%s' "$v" | grep -Eq '^[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}$'
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+      - name: Python with Pillow and FriBiDi
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libfribidi0
+          python3 -m pip install --user Pillow
+      - uses: actions/cache@v4
+        with:
+          path: base/.toolchain/downloads
+          key: jieli-${{ runner.os }}-${{ hashFiles('base/tools/toolchain.lock') }}
+      - name: Pinned JieLi toolchain and SDK files
+        run: ./build.sh --setup
+      - name: Emscripten 6.0.10
+        run: |
+          set -eu
+          git clone -q https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          git -C "$RUNNER_TEMP/emsdk" checkout -q a2b92777574c2feda07994cd4f1079a3dfc151f8
+          "$RUNNER_TEMP/emsdk/emsdk" install 6.0.10
+          "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.10
+      - name: Tests
+        run: sh tests/run_tests.sh
+      - name: Package, emulator and pages
+        run: |
+          set -eu
+          set +u; . "$RUNNER_TEMP/emsdk/emsdk_env.sh"; set -u
+          ./build.sh --release "$VERSION"
+          ./build.sh --web --release "$VERSION"
+          python3 base/tools/make_site.py app "app/build/nullwave-$VERSION.fwsc" "$VERSION" _site
+          mv _site/install _site/installer
+          python3 tools/brand.py _site
+          python3 tools/quick_start.py _site "$VERSION"
+          python3 tools/site_look.py _site "$VERSION" "nullwave-$VERSION.fwsc"
+          # the site's FM-1 pages, ready for nullwave-cc/site's fm1/ (docs/PUBLISH.md); the promo screens beside
+          mkdir -p dist
+          tar -czf "dist/nullwave-fm1-site-$VERSION.tar.gz" -C _site .
+          tar -czf "dist/nullwave-fm1-screens-$VERSION.tar.gz" -C docs/img/promo .
+          cp "app/build/nullwave-$VERSION.fwsc" dist/
+      - name: Release notes (CHANGELOG.md, this version's entry)
+        run: |
+          set -eu
+          awk -v v="## $VERSION" '$0 == v {on = 1; next} /^## / && on {exit} on' CHANGELOG.md > dist/notes.md
+          test -s dist/notes.md
+      - name: Draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
-          sha256sum --check SHA256SUMS
-          for package in build/release-assets/*.fwsc build/release-assets/*-app.bin build/release-assets/*.rfm1 \
-              build/release-assets/firmware.json; do
-            gh attestation verify "$package" --repo "$GITHUB_REPOSITORY" \
-              --signer-workflow zvenson/fm1-build/.github/workflows/build.yml \
-              --source-ref "$GITHUB_REF" --source-digest "$GITHUB_SHA"
-          done
-      - name: Publish the verified draft
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: gh release edit "$GITHUB_REF_NAME" --draft=false
+          gh release create "$GITHUB_REF_NAME" --draft --title "nullwave $VERSION" --notes-file dist/notes.md \
+            "dist/nullwave-$VERSION.fwsc" "dist/nullwave-fm1-site-$VERSION.tar.gz" \
+            "dist/nullwave-fm1-screens-$VERSION.tar.gz"

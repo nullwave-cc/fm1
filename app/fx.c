@@ -25,8 +25,8 @@ static float fm_fmodf(float x, float y)  /* x mod y, y > 0 */
 static float frand(int32_t *st) { return (float)((int32_t)(noise32(st) >> 8) - 8388608) / 8388608.0f; }
 
 /* ------------------------------------------------------------------ LFO --- */
-static struct { float ph, sh, fade; uint32_t had; int32_t rnd; } lfo[NCH];
-typedef struct { int32_t pit16, cut, shp, amp_q15; } chmod_t;
+static struct { float ph, sh, sh0, fade; uint32_t had; int32_t rnd; } lfo[NCH];
+typedef struct { int32_t pit16, cut, shp, amp_q15, lfo_q15; } chmod_t;   /* lfo_q15: the wave now (a mod source) */
 float synth_lfo_now(uint32_t ch, float *depth)   /* the graph view: the LFO's phase 0..1, its fade's depth now */
 {
     const sound_t *s = &snd[ch % NCH];
@@ -35,14 +35,14 @@ float synth_lfo_now(uint32_t ch, float *depth)   /* the graph view: the LFO's ph
     return lfo[ch % NCH].ph;
 }
 
-static void lfo_block(uint32_t ch, const sound_t *s, uint32_t voices, chmod_t *cm)
+static void lfo_block(uint32_t ch, const sound_t *s, uint32_t voices, chmod_t *cm, int needed)
 {
     static const float SYNC_Q[11] = {0, 16, 8, 4, 2, 1, 0.5f, 1.0f / 3.0f, 0.25f, 1.0f / 6.0f, 0.125f};
     float hz, x, depth = 1.0f, fade_s;
     memset(cm, 0, sizeof *cm);
     cm->amp_q15 = 32767;
-    if (!s->lfo_pit && !s->lfo_flt && !s->lfo_shp && !s->lfo_amp)
-        return;
+    if (!s->lfo_pit && !s->lfo_flt && !s->lfo_shp && !s->lfo_amp && !needed)
+        return;                          /* (needed: a mod slot takes the LFO as its source) */
     if (s->lfo_sync && s->lfo_sync <= 10u)
         hz = (float)tempo10 / 600.0f / SYNC_Q[s->lfo_sync];
     else
@@ -58,6 +58,7 @@ static void lfo_block(uint32_t ch, const sound_t *s, uint32_t voices, chmod_t *c
         lfo[ch].ph -= (float)(int32_t)lfo[ch].ph;
         if (!lfo[ch].rnd)
             lfo[ch].rnd = (int32_t)(ch * 977u + 12345u);
+        lfo[ch].sh0 = lfo[ch].sh;
         lfo[ch].sh = frand(&lfo[ch].rnd);
     }
     switch (s->lfo_wave) {
@@ -65,6 +66,11 @@ static void lfo_block(uint32_t ch, const sound_t *s, uint32_t voices, chmod_t *c
     case 2: x = lfo[ch].ph * 2.0f - 1.0f; break;
     case 3: x = lfo[ch].ph < 0.5f ? 1.0f : -1.0f; break;
     case 4: x = lfo[ch].sh; break;
+    case 5: {                            /* RND: from the last random value to the new one, eased (a smooth wander) */
+        float e = lfo[ch].ph * lfo[ch].ph * (3.0f - 2.0f * lfo[ch].ph);
+        x = lfo[ch].sh0 + (lfo[ch].sh - lfo[ch].sh0) * e;
+        break;
+    }
     default: x = (float)sine_i((uint32_t)(lfo[ch].ph * 4294967295.0f)) / 32768.0f; break;
     }
     if (s->lfo_pol)
@@ -75,6 +81,7 @@ static void lfo_block(uint32_t ch, const sound_t *s, uint32_t voices, chmod_t *c
         depth = fm_minf(1.0f, lfo[ch].fade / fade_s);
     }
     x *= depth;
+    cm->lfo_q15 = (int32_t)(x * 32767.0f);
     cm->pit16 = (int32_t)(x * (float)s->lfo_pit * 192.0f / 63.0f);   /* 63: an octave */
     cm->cut = (int32_t)(x * (float)s->lfo_flt * (float)(64 << 8) / 63.0f);
     cm->shp = (int32_t)(x * (float)s->lfo_shp * (float)(64 << 8) / 63.0f);

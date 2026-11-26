@@ -1,0 +1,11 @@
+# A new build's first start says INSTALLED and its version, under the logo and then on the screen, once (app.c
+# seen_build). The host says it only with NW_FRESH=1 in the environment (tests/run_tests.sh sets it for this script):
+#   NW_FRESH=1 app/build/host/nullwave_host app/tests/installed.txt app/build/host
+wait 1800
+expect installed 1
+wait 5000
+expect installed 0
+# the next start: the same build, nothing said
+reboot
+wait 1800
+expect installed 0

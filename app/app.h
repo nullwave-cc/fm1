@@ -34,6 +34,29 @@ enum { OBJ_SETTINGS, OBJ_PANEL, OBJ_BLE, OBJ_SOUND, OBJ_NOBJ };
 int app_file_busy(void);                 /* 1: no file written now (playing) */
 void app_file_changed(uint32_t obj);     /* the computer wrote obj: load it again */
 
+/* the editor (docs/EDITOR-PROTOCOL.md): the selected channel's sound as a file of its own, "preset" (written: heard on
+ * the channel at once, kept in a user slot if it asks; read: the channel's sound now), and its parameters, each in a
+ * group (osc, filter, env, lfo, fx, mod) for a page to lay out */
+#define APP_FILES
+int app_file(uint32_t i, plat_file_info_t *f);
+int app_file_read(uint32_t i, uint32_t off, uint8_t *dst, uint32_t n);
+int app_file_begin(uint32_t i, uint32_t size);
+int app_file_write(uint32_t i, uint32_t off, const uint8_t *src, uint32_t n);
+int app_file_commit(uint32_t i, uint32_t size, uint32_t crc);
+int app_file_delete(uint32_t i);
+#define APP_COMPANION_EXTRAS "editor=nullwave/1"
+#define APP_UPDATE_BEGIN                 /* app_update_begin: an install begins, nullwave stops and says so */
+int app_update_begin(void);
+#define APP_RESTART                      /* plat_restart: after a factory reset */
+#define APP_BOOT                         /* app_boot: HOME held at power-on, the settings to their defaults (songs kept) */
+void app_boot(void);
+#define APP_PARAMS
+#define APP_PARAM_MAX 64
+int app_param(uint32_t i, plat_param_t *p);
+const char *app_param_group(uint32_t g);
+int32_t app_param_get(uint32_t i);
+int32_t app_param_set(uint32_t i, int32_t v);
+
 /* the contract: the platform calls these */
 void app_init(void);                     /* boot: the engine, then the saved settings (or defaults) */
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12);   /* audio interrupt: n stereo frames, 24-bit */

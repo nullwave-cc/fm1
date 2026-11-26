@@ -1,13 +1,12 @@
 # SPDX-License-Identifier: MPL-2.0
 # The install site on GitHub Pages: the web installer, the browser emulator and the manual, from a release build
-# (base/tools/make_site.py). Runs on a version tag, or by hand with a version. Pages must be set to deploy from
-# GitHub Actions in the repository's settings.
+# (base/tools/make_site.py), the quick start and the site's design. By hand, with a version: a preview. The public pages
+# are nullwave.cc's (nullwave-cc/site), from a release (release.yml, docs/PUBLISH.md). Pages must be set to deploy
+# from GitHub Actions in the repository's settings.
 name: Site
 
 on:
-  push:
-    tags: ['v[0-9]*']
-  workflow_dispatch:
+  workflow_dispatch:                     # (a preview on this repository's Pages, by hand; a release: release.yml)
     inputs:
       version:
         description: "Version, X.Y[.Z][-suffix] (e.g. 0.1-alpha)"
@@ -64,6 +63,10 @@ jobs:
           mv _site/install _site/installer
           sed -i 's#"install/"#"installer/"#g' _site/index.html
           python3 tools/brand.py _site
+          # the quick start (docs/QUICK-START.md, its pictures from docs/img/quick)
+          python3 tools/quick_start.py _site "$VERSION"
+          # the site's design (assets/web: style.css, device.js, the logos), for nullwave.cc/fm1/
+          python3 tools/site_look.py _site "$VERSION" "nullwave-$VERSION.fwsc"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

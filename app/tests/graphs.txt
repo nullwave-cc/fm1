@@ -1,8 +1,7 @@
 # The graph view: SHIFT (OCT- or OCT+ held) + a page's own button. One screenshot a graph (app/docs/img with
 #   app/build/host/nullwave_host app/tests/graphs.txt app/docs/img)
 wait 900
-turn ALGO 1
-expect channel 1
+expect channel 0
 # GRAPHS, the default (SETTINGS, SCREEN): on, then off again
 press OCT-
 tap GLO
@@ -162,12 +161,13 @@ expect graph 0
 tap ENV
 wait 30
 expect graph 1
-# the light theme
+# the light theme (SETTINGS, SCREEN: THEME)
 press OCT-
 tap GLO
 release OCT-
-tap GLO
 turn K1 1
+expect display 1
+wait 1400
 tap ENV
 key 0 down 100
 wait 120

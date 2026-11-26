@@ -1,0 +1,81 @@
+# FACTORY RESET (SETTINGS > SYSTEM 2, KNOB 1 turned, then PLAY held 3 s): the songs, user presets, names and settings
+# erased, a restart, and the FM-1 as a first start finds it; PLAY let go early: nothing. Run by tests/run_tests.sh:
+#   app/build/host/nullwave_host app/tests/factory_reset.txt app/build/host
+wait 1800
+# fill: an octave up, HOME VIEW LOOP, TRANS -3, the sound in user slot 5 (named), the song saved
+tap OCT+
+wait 30
+press HOME
+wait 900
+release HOME
+wait 50
+turn SELECT 1
+wait 30
+turn K1 1
+wait 30
+press HOME
+wait 900
+release HOME
+wait 50
+press SEL
+wait 600
+turn K4 -3
+wait 30
+release SEL
+wait 30
+tap SAVE
+wait 30
+turn SELECT -1
+wait 30
+turn K1 4
+wait 30
+turn K4 1
+wait 30
+turn K4 1
+wait 300
+expect u05:SAW_LEAD 1
+tap SAVE
+wait 30
+tap SAVE
+wait 30
+tap SAVE
+wait 3000
+reboot
+wait 1800
+expect octave 1
+expect home_view 1
+expect transpose -3
+# SETTINGS > SYSTEM 2 (the seventh page), KNOB 1: armed; PLAY let go after 1 s: nothing done
+press HOME
+wait 900
+release HOME
+wait 50
+turn SELECT 6
+wait 30
+expect page 64
+turn K1 1
+wait 30
+press PLAY
+wait 1000
+release PLAY
+wait 300
+expect playing 0
+expect transpose -3
+expect u05:SAW_LEAD 1
+# again, PLAY held 3 s: erased, restarted
+turn K1 1
+wait 30
+press PLAY
+wait 3200
+release PLAY
+wait 4000
+expect octave 0
+expect home_view 0
+expect transpose 0
+expect u05:EMPTY 1
+expect page 0
+reboot
+wait 1800
+expect octave 0
+expect transpose 0
+expect u05:EMPTY 1

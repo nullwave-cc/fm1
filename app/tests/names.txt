@@ -1,0 +1,85 @@
+# A channel's name (SHIFT + SAVE): K1 the cursor, K2 its character, K3 a ready name, K4 clear; SAVE again keeps it,
+# HOME leaves it as it was. A new song has the kit on channel 6, named DRUMS; the names are saved with the song
+wait 1800
+expect channel 0
+expect engine 0
+expect named 32
+turn ALGO -1
+expect engine 12
+turn ALGO 1
+# a ready name: BASS (the second) on channel 1
+press OCT-
+wait 30
+tap SAVE
+wait 30
+release OCT-
+wait 30
+expect page 57
+turn ALGO 1
+turn PRESET 1
+expect channel 0
+expect preset 0
+turn K3 2
+listen
+tap SAVE
+wait 30
+said CH 1 BASS
+expect page 0
+expect named 33
+expect song_dirty 1
+# cleared, then HOME: as it was
+press OCT-
+wait 30
+tap SAVE
+wait 30
+release OCT-
+turn K4 1
+tap HOME
+wait 30
+expect page 0
+expect named 33
+# cleared and kept: no name
+press OCT-
+wait 30
+tap SAVE
+wait 30
+release OCT-
+turn K4 1
+tap SAVE
+wait 30
+expect named 32
+# typed: B, then A (K2 walks SPACE A B ..., K1 moves on)
+press OCT-
+wait 30
+tap SAVE
+wait 30
+release OCT-
+turn K2 2
+turn K1 1
+turn K2 1
+listen
+tap SAVE
+wait 30
+said CH 1 BA
+expect named 33
+# saved with the song, back after a power cycle
+tap SAVE
+wait 30
+expect page 16
+tap SAVE
+wait 30
+tap SAVE
+wait 300
+expect song_dirty 0
+reboot
+wait 1800
+expect named 33
+listen
+press OCT-
+wait 30
+tap SAVE
+wait 30
+release OCT-
+said NAME BA
+tap HOME
+wait 30

@@ -49,10 +49,35 @@ enum { SP_ATK, SP_REL, SP_FTYPE, SP_E0, SP_E1, SP_E2, SP_E3, SP_E4, SP_E5, SP_E6
        SP_LFO_PIT, SP_LFO_FLT, SP_LFO_SHP, SP_LFO_AMP, SP_PENV, SP_SENV,
        SP_GLIDE, SP_GLMOD, SP_PRIO, SP_ALLOC, SP_DTUNE, SP_SPREAD, SP_VMUTE,
        SP_ARP, SP_ARP_RATE, SP_ARP_OCT, SP_ARP_GATE, SP_ARP_SWING, SP_ARP_PROB, SP_ARP_HOLD, SP_ARP_ORDER,
-       SP_TFILT, SP_X0, SP_N = SP_X0 + 16 };
+       SP_TFILT, SP_X0,
+       /* (after the engine's extras: kept apart from sound_t, in the channel's synth_mod_t, never locked) */
+       SP_E2_ATK = SP_X0 + 16, SP_E2_DEC, SP_E2_SUS, SP_E2_REL,
+       SP_M1_SRC, SP_M1_DST, SP_M1_AMT, SP_M2_SRC, SP_M2_DST, SP_M2_AMT, SP_M3_SRC, SP_M3_DST, SP_M3_AMT,
+       SP_M4_SRC, SP_M4_DST, SP_M4_AMT, SP_N };
 #define SP_LOCKABLE(id) ((id) != SP_FTYPE && (id) != SP_MONO && (id) != SP_FLT && (id) != SP_INS && (id) != SP_SLC \
                          && (id) != SP_LFO_WAVE && (id) != SP_LFO_SYNC && (id) != SP_LFO_TRIG && (id) != SP_LFO_POL \
                          && ((id) < SP_ARP || (id) > SP_ARP_ORDER) && (id) < SP_X0)
+
+/* a channel's modulation, beside its sound (the song keeps it, a user preset too): ENV 2 (its own ADSR) and four
+ * slots, each a source, a target and a bipolar amount. Saved as it is: new sources and targets go after the last */
+#define SYN_MODS 4
+#define SYN_MOD_VER 1
+enum { MS_OFF, MS_ENV, MS_ENV2, MS_LFO, MS_VEL, MS_PRS, MS_RND, MS_N };   /* ENV the volume's, PRS the key's pressure,
+                                                                         * RND a value each note */
+enum { MT_OFF, MT_CUT, MT_PIT, MT_SHP, MT_AMP, MT_PAN, MT_LFO, MT_N };   /* SHP: the engine's shape (PWM, the sync
+                                                                         * sweep, SUPER's morph), LFO: its depth */
+typedef struct {
+    uint8_t ver;                         /* SYN_MOD_VER */
+    uint8_t e2[4];                       /* ENV 2: ATK DEC SUS REL, 0..127 */
+    struct { uint8_t src, dst; int8_t amt; } m[SYN_MODS];   /* amt -64..63 */
+    uint8_t rsv[3];
+} synth_mod_t;
+void synth_default_mod(synth_mod_t *m);
+int synth_mod_ok(const synth_mod_t *m);
+void synth_set_mod(uint32_t ch, const synth_mod_t *m);
+const synth_mod_t *synth_mod(uint32_t ch);
+int32_t synth_mod_now(uint32_t ch, uint32_t dst);
+int32_t synth_cut_mod(uint32_t ch);     /* the graph view: the newest voice's cutoff modulation now, << 8 (0 none) */   /* the screen: the sum the slots put on a target now, -32768..32767 */
 
 void synth_init(void);
 void synth_note_on(uint32_t ch, uint32_t note, uint32_t vel);   /* vel 1..127 */
@@ -74,12 +99,17 @@ uint32_t synth_nengines(void);
 uint32_t synth_npresets(uint32_t ch);
 const char *synth_engine_name(uint32_t engine);
 const char *synth_preset_name(uint32_t ch);
+#define SYN_NAME 16                      /* a user preset's name, at most */
+void synth_set_name(uint32_t ch, const char *nm, uint32_t len);
+const char *synth_own_name(uint32_t ch);       /* the name synth_set_name gave, "" none */
 const char *synth_page_title(uint32_t ch, uint32_t page);   /* the engine's EDIT 1 / EDIT 2 */
 /* every sound of every engine in one list (PRESETS): by kind, the kits last */
 uint32_t synth_nsounds(void);
 uint32_t synth_sound_index(uint32_t ch);
 void synth_sound_pick(uint32_t ch, uint32_t index);
 int synth_is_kit(uint32_t ch);
+int synth_fm6_mute(uint32_t ch, uint32_t op);   /* FM6: an operator muted or back (EDIT + OP key held); 1 muted */
+uint32_t synth_fm6_mutes(uint32_t ch);
 int synth_lane_mute(uint32_t ch, uint32_t lane);   /* DRUM: a lane muted or back (EDIT + black key); 1 muted */
 uint32_t synth_lane_mutes(uint32_t ch);
 const char *synth_kit_sound(uint32_t i);   /* DRUM: lane i's name (0..7) */
@@ -92,6 +122,8 @@ void synth_param_set(uint32_t ch, uint32_t id, int32_t v);   /* held to its rang
 void synth_param_turn(uint32_t ch, uint32_t id, int32_t d);  /* d detents (a wide range moves more) */
 void synth_param_range(uint32_t ch, uint32_t id, int32_t *lo, int32_t *hi);
 const char *synth_param_label(uint32_t ch, uint32_t id);
+const char *const *synth_param_names(uint32_t ch, uint32_t id);   /* an enum's labels, 0 a number */
+int32_t synth_param_default(uint32_t ch, uint32_t id);
 void synth_param_text(uint32_t ch, uint32_t id, int32_t v, char *out);   /* v as the screen shows it, <= 7 chars */
 uint32_t synth_knob_param(uint32_t ch, uint32_t k);          /* the engine's HOME knob k (EDIT's first page) */
 /* the sequencer's parameter locks: id held at v until unlocked (the sound itself is not changed) */
@@ -118,6 +150,10 @@ int synth_audible(uint32_t ch);
 /* the graph view: the scope of one channel (NCH: none), the newest voice's envelope (Q15; stage 0 off, 1 attack,
  * 2 decay/sustain, 3 release), the LFO's phase (0..1) and its fade's depth */
 void synth_shed(void);
+void synth_load(uint32_t p);             /* the render's load, x16 permille: the voices' budget follows it */
+uint32_t synth_budget(void);
+uint32_t synth_budget_used(void);
+uint32_t synth_budget_sheds(void);
 uint32_t synth_quiet_pct(void);          /* the render's silent blocks since the last call, % (nothing rendered) */                  /* the render near its time: the oldest voice let go fast */
 void synth_lowcut(int on);               /* MENU AUDIO LOWCUT: the lows out while the speaker plays */
 void synth_scope_ch(uint32_t ch);
@@ -160,4 +196,10 @@ void synth_vel_sens(int32_t sens);
 enum { PRS_OFF, PRS_FILTER, PRS_VOLUME, PRS_BOTH, PRS_NMODES };
 void synth_pressure_mode(uint32_t mode);
 const char *synth_pressure_name(uint32_t mode);
-uint32_t synth_voices(uint32_t ch);      /* voices sounding on ch (the screen; tests) */
+uint32_t synth_voices(uint32_t ch);
+/* what a channel's voices are doing now, for the screen: each sounding one's note, velocity, key held, amplitude
+ * (0..255) and its start (a number that changes with each new note in that slot); out[NVOICE_MAX], the count */
+#define SYN_VMAX 6
+typedef struct { uint8_t slot, note, vel, gate, amp; uint32_t start; } synth_vview_t;
+uint32_t synth_voice_view(uint32_t ch, synth_vview_t *out);
+int synth_drum_lane(uint32_t note);      /* DRUM: the lane (0..7) a note plays, -1 none */      /* voices sounding on ch (the screen; tests) */

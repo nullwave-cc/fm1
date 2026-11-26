@@ -1,0 +1,3 @@
+#!/bin/sh
+# the host compiler with the HD render on (app/hd.c): tools/hd_shots.py builds the simulator through it
+exec "${NW_CC:-cc}" -DNW_HD "$@"

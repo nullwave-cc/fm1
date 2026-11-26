@@ -1,0 +1,88 @@
+# ENV 2 and the mod slots (LFO > MOD 1..4, ENV > ENV 2), the LFO's smooth random, the SUPER engine's oscillators; the
+# slots kept with the song
+wait 1800
+# SUPER (the last engine): each of its six waves sounds
+tap SAVE
+wait 30
+turn SELECT -2
+wait 30
+turn K2 13
+tap HOME
+wait 1500
+expect engine 13
+key 7 down 100
+wait 200
+expect peak_db_min -40
+key 7 up
+wait 800
+tap EDIT
+wait 30
+turn K1 1
+key 7 down 100
+wait 200
+expect peak_db_min -40
+key 7 up
+turn K1 1
+key 7 down 100
+wait 200
+expect peak_db_min -40
+key 7 up
+turn K1 1
+key 7 down 100
+wait 200
+expect peak_db_min -40
+key 7 up
+turn K1 1
+key 7 down 100
+wait 200
+expect peak_db_min -40
+key 7 up
+turn K1 1
+key 7 down 100
+wait 200
+expect peak_db_min -40
+key 7 up
+tap HOME
+wait 1500
+# MOD 1 is ENV 2 > CUT ready: its amount up (to the top), a held note's cutoff moves
+tap LFO
+tap LFO
+tap LFO
+tap LFO
+wait 30
+expect page 60
+turn K3 40
+expect slot1 63
+key 7 down 100
+wait 100
+expect mod_cut >0
+key 7 up
+# MOD 2: LFO > PAN (the LFO otherwise off): the channel's pan moves
+turn SELECT 1
+wait 30
+expect page 61
+turn K1 3
+turn K2 5
+turn K3 63
+key 7 down 100
+wait 1500
+expect mod_pan >0
+key 7 up
+tap HOME
+wait 1500
+# ENV 2's page (ENV, third): ATK
+tap ENV
+tap ENV
+tap ENV
+wait 30
+expect page 59
+# kept with the song: saved, a new power-on, the same slots
+tap SAVE
+wait 30
+tap SAVE
+wait 30
+tap SAVE
+wait 300
+reboot
+wait 1800
+expect slot1 63

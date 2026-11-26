@@ -21,8 +21,10 @@
 #define TPS 24                           /* ticks a sixteenth */
 #define TBAR 384                         /* ticks a bar (4/4) */
 #define SEQ_NOLOCK 0x7FFF                /* seq_step_lock: none */
+#define SONG_NAME 8                      /* a channel's name: up to 8 characters (A-Z 0-9 space - . / + # & !) */
 
-enum { EV_RATCH = 3, EV_LOCK = 4, EV_FILL = 8, EV_NOFILL = 16, EV_SKIP = 64 };   /* FILL: plays only in a fill */
+enum { EV_RATCH = 3, EV_LOCK = 4, EV_FILL = 8, EV_NOFILL = 16, EV_SKIP = 64, EV_NEW = 128 };   /* FILL: plays only in a
+                                         * fill; NEW: recorded in the REPLACE pass under way (never kept in a song) */
 typedef struct {
     uint16_t pos;                        /* ticks from the pattern's start */
     uint8_t note, vel;                   /* a lock: the parameter (SP_*) and its value + 128 */
@@ -61,6 +63,10 @@ typedef struct {
     scene_t scene[NSCENE];
     sect_t chain[NCHAIN];
     uint8_t fm6[NCH][SYN_FM6_BYTES];     /* each channel's own FM6 patch */
+    char name[NCH][SONG_NAME];           /* each channel's name, 0-padded; empty: the screen names its engine */
+    synth_mod_t mod[NCH];                /* each channel's ENV 2 and mod slots (SONG_VER 5) */
+    char sname[NCH][SYN_NAME];           /* each channel's sound's own name (a user preset's), 0-padded; empty:
+                                          * its preset's (SONG_VER 5) */
     pat_t pat[NCH][NPAT];
 } song_t;
 
@@ -88,6 +94,8 @@ uint32_t seq_rec(void);                  /* REC_* */
 uint32_t seq_rec_ch(void);
 void seq_rec_button(uint32_t ch);        /* REC tapped, ch the selected channel */
 void seq_rec_off(void);
+void seq_replace_changed(void);         /* REC MODE turned while recording: the pass as it stands */
+int seq_take_kept(void);                 /* 1 once after a REPLACE pass stopped short (the last full take kept) */
 int32_t seq_take_ms(void);               /* a free take: its length so far */
 void seq_clear(uint32_t ch);             /* hold REC: the channel's pattern emptied (undo brings it back) */
 void seq_note_on(uint32_t ch, uint32_t note, uint32_t vel);   /* a played note: recorded, arms a take */

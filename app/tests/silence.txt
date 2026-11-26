@@ -1,0 +1,92 @@
+# Why a channel is silent, always on the screen: PLAY's red notice (MUTED, SOLO ELSEWHERE, LEVEL 0), a layer kept
+# open (SEL held, HOME tapped: the keys set the KEY, the title says how to play again). Run by tests/run_tests.sh:
+#   app/build/host/nullwave_host app/tests/silence.txt app/build/host
+wait 1800
+expect view 0
+expect why: 1
+# GLO held, F4: channel 1 muted
+press GLO
+wait 600
+tapkey 12 100
+wait 30
+release GLO
+wait 30
+expect why:MUTED 1
+press GLO
+wait 600
+tapkey 12 100
+wait 30
+# G#4: channel 2 soloed, so channel 1 is silent
+tapkey 15 100
+wait 30
+release GLO
+wait 30
+expect why:SOLO_ELSEWHERE 1
+press GLO
+wait 600
+tapkey 15 100
+wait 30
+release GLO
+wait 30
+expect why: 1
+# LEVEL to 0 (LOOP's K2), then back
+press OCT-
+wait 30
+tap HOME
+wait 30
+release OCT-
+wait 30
+turn K2 -127
+wait 30
+expect why:LEVEL_0 1
+turn K2 100
+wait 30
+expect why: 1
+press OCT-
+wait 30
+tap HOME
+wait 30
+release OCT-
+wait 30
+# SEL held, HOME tapped: the KEY layer kept; a key sets the KEY, no note
+press SEL
+wait 600
+tap HOME
+wait 30
+release SEL
+wait 30
+expect layer_kept 1
+tapkey 12 100
+wait 30
+expect voices 0
+# SEL tapped: the layer goes, the keys play
+tap SEL
+wait 100
+expect layer_kept -1
+key 12 down 100
+wait 60
+expect voices >0
+key 12 up
+# OCT- twice and TRANS -24 (SEL held, KNOB 4): C4 at 12, too low to hear
+tap OCT-
+wait 30
+tap OCT-
+wait 30
+press SEL
+wait 600
+turn K4 -127
+wait 30
+release SEL
+wait 30
+expect why:TOO_LOW:_OCT,_TRANS 1
+press SEL
+wait 600
+turn K4 127
+wait 30
+release SEL
+wait 30
+tap OCT+
+wait 30
+tap OCT+
+wait 30
+expect why: 1

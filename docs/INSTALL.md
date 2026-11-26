@@ -46,6 +46,11 @@ If the FM-1 runs M-VAVE's "Open" firmware, put the stock firmware back first: th
 - **If nullwave starts but USB doesn't answer:** hold REC while switching on. The FM-1 goes into the chip's update
   mode, and the installer or M-UPGRADE can write it again. After two failed starts in a row nullwave also opens a
   safe mode on its own, where USB still works.
+- **If a setting leaves nullwave silent or odd:** hold HOME while switching on. The settings go back to their
+  defaults; songs, user sounds and names stay.
+- **To start over as just installed:** "Reset to factory" on the web installer (it offers a backup first), or on the
+  FM-1 SETTINGS → SYSTEM 2, turn KNOB 1, hold PLAY 3 s. It erases nullwave's songs, user sounds and settings, never
+  the firmware or the FM-1's updater.
 - **If the FM-1 doesn't start at all:** restore the M-Flasher backup (its README explains the chip's boot mode).
   Installing m-bootloader, which the web installer offers, adds a recovery menu that works even then: hold PLAY while
   switching on.

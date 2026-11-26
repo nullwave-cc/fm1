@@ -9,6 +9,7 @@
  * This file: the settings the FM-1 keeps (OBJ_SETTINGS, the preferences in OBJ_SOUND), the notes' way to the synth,
  * MIDI in, the render, the platform's contract. Part of the unity build (device/unity.c, host/plat_host.c), after the
  * platform: gfx.c and announce.c are in scope; seq.c, ui_draw.c and ui.c are included here. */
+#include <stddef.h>
 #include "fastmath.h"
 #include "synth.h"
 #include "seq.h"
@@ -46,11 +47,22 @@ typedef struct {
     uint16_t graph_on, graph_set;        /* SHIFT + a page's button: bit i the graph kind i on, and set (else the default) */
     uint8_t learn[8][3];                 /* MIDI LEARN: a CC (0 none), the MIDI channel it comes on, the parameter (SP_*) */
     seq_cfg_t sc;                        /* the sequencer's: REC, the click, the launch, sync, clock and notes out */
+    uint8_t home_view;                   /* SCREEN 2 HOME VIEW: MAIN at power-on, 0 PLAY, 1 LOOP */
+    uint8_t loop_manual;                 /* SCREEN 2 AUTO LOOP ON REC: 0 ON (REC shows LOOP), 1 OFF */
+    uint8_t spare;                       /* (once PLAY's style in test builds: ignored; PLAY draws the wave) */
+    uint32_t seen_build;                 /* the build that last started (FM1B_BUILD): another says INSTALLED once */
 } prefs_t;
+#define PREFS_V6_SIZE 88u                /* (the preferences before HOME VIEW: they load, with the two at their defaults) */
+_Static_assert(offsetof(prefs_t, home_view) == PREFS_V6_SIZE, "the older preferences end where HOME VIEW starts");
+#define PREFS_V7_SIZE 92u                /* (and before the build seen: they load, it 0, so INSTALLED shows once) */
+_Static_assert(offsetof(prefs_t, seen_build) == PREFS_V7_SIZE, "the older preferences end where the build seen starts");
+static uint8_t fresh_build;              /* this build starts for the first time: the logo says INSTALLED */
 static prefs_t prefs;
 static uint8_t set_dirty;                /* changed since the last write: written when the FM-1 is quiet */
 static uint32_t set_dirty_at;
 static void keys_config(void);
+static uint32_t boot_ignore;             /* the buttons held at power-on for app_boot, ignored till released (ui.c) */
+static uint8_t boot_reset;               /* app_boot reset the settings: the screen says so */
 static void app_mark(void)
 {
     set_dirty = 1;
@@ -209,7 +221,9 @@ static void midi_in(void)                    /* audio interrupt: the packets tha
 /* the render's load: its time against the block's, a peak that falls (GLO SYSTEM CPU) */
 static volatile uint32_t nw_cpu;
 static uint32_t shed_wait;               /* blocks before the overload guard may fade another voice */
-static volatile uint32_t sheds;          /* voices it faded (the screen says VOICE LIMIT) */
+#ifdef PLAT_HOST
+static uint64_t rd_ticks, rd_budget;
+#endif
 void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
 {
     uint32_t t0 = plat_ticks24(), dt, budget = n * (PLAT_TICKS_PER_US * 1000000u / 44100u), p;
@@ -217,15 +231,19 @@ void app_render(int32_t *lr, uint32_t n, uint32_t master_q12)
     seq_render(n);
     synth_render(lr, n, master_q12);
     dt = (plat_ticks24() - t0) & 0xFFFFFFu;   /* (a 24-bit clock: its wrap is no huge span) */
+#ifdef PLAT_HOST
+    rd_ticks += dt;                      /* (the host: the render's time, for expect render_permille) */
+    rd_budget += budget;
+#endif
     p = budget ? dt * 1600u / budget : 0u;   /* (x16: the peak falls a 64th a block, ~1.5 s) */
     if (shed_wait)
         shed_wait--;
-    else if (p > 1520u) {                /* the last resort, within 5 % of the deadline: the oldest voice faded, one
-                                          * at a time, then a rest of 16 blocks (~12 ms) to see what that did */
-        synth_shed();
-        shed_wait = 16;
-        sheds++;
-    }
+    else if (p > 1150u) {                /* over ~72 %: the voices' budget tightens (and above ~85 % a voice fades now),
+                                          * then a rest of 8 blocks (~6 ms) to see what that did (synth.c synth_load) */
+        synth_load(p);
+        shed_wait = 8;
+    } else
+        synth_load(p);                   /* (and eases back when it is easy) */
     nw_cpu = p > nw_cpu ? p : nw_cpu - nw_cpu / 64u;
 }
 
@@ -288,17 +306,30 @@ static void prefs_defaults(void)
 static void prefs_load(void)
 {
     uint32_t i;
-    int ok = plat_store_load(OBJ_SOUND, &prefs, sizeof prefs) == (int)sizeof prefs && prefs.magic == PREFS_MAGIC
+    int n = plat_store_load(OBJ_SOUND, &prefs, sizeof prefs);
+    int ok = (n == (int)sizeof prefs || n == (int)PREFS_V6_SIZE || n == (int)PREFS_V7_SIZE) && prefs.magic == PREFS_MAGIC
              && prefs.key_learn <= 1u && prefs.fixed_vel <= 127u && prefs.prs_mode < PRS_NMODES
              && prefs.display <= 1u && prefs.slot < NSONG && prefs.sc.rec_bars >= 1u && prefs.sc.rec_bars <= 8u
              && prefs.sc.launch <= LQ_NOW && prefs.sc.sync <= SYNC_BLE && prefs.sc.click <= CLICK_ON
              && prefs.in_mode <= 17u && prefs.other <= 1u && prefs.bend >= 1u && prefs.bend <= 12u && prefs.drmap <= 1u
              && prefs.remote <= 16u && prefs.fxch <= 16u && prefs.tune >= -50 && prefs.tune <= 50
              && prefs.reso <= 10u && prefs.pfade <= 15u && prefs.graphs <= 1u;
+    if (ok && n == (int)PREFS_V6_SIZE)
+        prefs.home_view = prefs.loop_manual = 0;
+    if (prefs.home_view > 1u || prefs.loop_manual > 1u)
+        prefs.home_view = prefs.loop_manual = 0;
+    prefs.spare = 0;
+    if (ok && n != (int)sizeof prefs)
+        prefs.seen_build = 0;
     for (i = 0; ok && i < NCH; i++)
         ok = prefs.midi_ch[i] <= 16u;
     if (!ok)
         prefs_defaults();
+    fresh_build = prefs.seen_build != (uint32_t)FM1B_BUILD;
+#ifdef PLAT_HOST
+    fresh_build = fresh_build && getenv("NW_FRESH");   /* (the host: every run a first start; said only when asked,
+                                                         * so the tests' and the pictures' screens stay as they were) */
+#endif
     seq_cfg = prefs.sc;
     synth_tune(prefs.tune);
     synth_master_set(MST_RESO, prefs.reso);
@@ -325,6 +356,31 @@ void app_init(void)
     synth_vel_sens(set.vsens);
 }
 
+/* HOME held (alone) at power-on: the settings and preferences back to their defaults, the songs, user presets, names
+ * and the FM6 bank kept, and the song that was open still opens (a way back from a setting that silenced the FM-1,
+ * with no computer). The platform's own power-on keys (REC, OCT- + OCT+) are seen before this */
+void app_boot(void)
+{
+    uint8_t slot = prefs.slot, fav[sizeof prefs.fav];
+    boot_reset = 0;
+    if ((plat_buttons() & ((1u << NB) - 1u)) != 1u << B_HOME)
+        return;
+    memcpy(fav, prefs.fav, sizeof fav);
+    settings_defaults();
+    prefs_defaults();
+    prefs.slot = slot;                   /* (the favourites and the song open are the player's, not settings) */
+    memcpy(prefs.fav, fav, sizeof fav);
+    seq_cfg = prefs.sc;
+    synth_vel_sens(set.vsens);
+    synth_tune(prefs.tune);
+    synth_master_set(MST_RESO, prefs.reso);
+    synth_punch_fade(prefs.pfade);
+    synth_pressure_mode(prefs.prs_mode);
+    save_prefs();
+    boot_ignore = 1u << B_HOME;
+    boot_reset = 1;
+}
+
 int nullwave_ble_off(void) { return set.ble_off; }
 
 /* --------------------------------------------- user presets, the FM6 bank --- */
@@ -338,6 +394,8 @@ typedef struct {
     uint32_t magic;
     sound_t snd;
     uint8_t fm6[SYN_FM6_BYTES];
+    synth_mod_t mod;                     /* (a preset from before it: its bytes erased, 0xFF: not ok, the default) */
+    char name[SYN_NAME];                 /* its name, 0-padded (from before it: not a name, "USER n") */
 } user_t;
 _Static_assert(sizeof(user_t) <= 256u, "a user preset fits its 256 bytes");
 static const user_t *user_at(uint32_t i)
@@ -347,6 +405,20 @@ static const user_t *user_at(uint32_t i)
     return u && u->magic == USER_MAGIC && synth_sound_ok(&u->snd) ? u : 0;
 }
 static int user_used(uint32_t i) { return user_at(i % 32u) != 0; }
+static const char *user_name(uint32_t i)   /* a slot's name, "EMPTY", or "-" (a preset from before names) */
+{
+    static char nm[SYN_NAME + 1];
+    const user_t *u = user_at(i % 32u);
+    uint32_t k;
+    if (!u)
+        return "EMPTY";
+    if (!((u->name[0] >= 'A' && u->name[0] <= 'Z') || (u->name[0] >= '0' && u->name[0] <= '9')))
+        return "-";
+    for (k = 0; k < SYN_NAME && u->name[k]; k++)
+        nm[k] = u->name[k];
+    nm[k] = 0;
+    return nm;
+}
 static int user_load(uint32_t i, uint32_t ch)
 {
     const user_t *u = user_at(i % 32u);
@@ -354,6 +426,18 @@ static int user_load(uint32_t i, uint32_t ch)
         return 0;
     memcpy(synth_fm6_own(ch), u->fm6, SYN_FM6_BYTES);
     synth_set_sound(ch, &u->snd);
+    synth_set_mod(ch, &u->mod);          /* (not ok: the default) */
+    if ((u->name[0] >= 'A' && u->name[0] <= 'Z') || (u->name[0] >= '0' && u->name[0] <= '9'))
+        synth_set_name(ch, u->name, SYN_NAME);
+    else {
+        char t[8] = "USER ";
+        uint32_t s = i % 32u + 1u, k = 5;
+        if (s >= 10u)
+            t[k++] = (char)('0' + s / 10u);
+        t[k++] = (char)('0' + s % 10u);
+        t[k] = 0;
+        synth_set_name(ch, t, 8);
+    }
     seq_touch();
     return 1;
 }
@@ -377,6 +461,13 @@ static int user_save(uint32_t i, uint32_t ch)
     u.magic = USER_MAGIC;
     u.snd = *synth_sound(ch);
     memcpy(u.fm6, synth_fm6_own(ch), SYN_FM6_BYTES);
+    u.mod = *synth_mod(ch);
+    {                                    /* (its name: the sound's, as shown, a user preset's or the editor's) */
+        const char *nm = synth_preset_name(ch);
+        uint32_t k;
+        for (k = 0; k < SYN_NAME && nm[k]; k++)
+            u.name[k] = nm[k];
+    }
     return user_write(i % 32u, &u);
 }
 static int user_erase(uint32_t i) { return user_write(i % 32u, 0); }
@@ -441,8 +532,67 @@ static void sysex_poll(void)
     sx_done = 0;
 }
 
+#include "hd.c"                          /* (host only, NW_HD: the UI at 4x as well) */
 #include "ui_draw.c"
 #include "ui.c"
+
+/* FACTORY RESET (SETTINGS SYSTEM, PLAY held 3 s; or the companion's "factory-reset" file): nullwave's own storage
+ * erased (the songs with their scenes and names, the user presets, the FM6 bank: 0x97000..0xD9FFF), its settings and
+ * preferences put back to their defaults, then a restart: the next start is a first start. Never the firmware, the
+ * update loader or the bootloader, nor fm1-base's own objects (the panel's calibration, the Bluetooth pairings). A
+ * sector a frame, the ring filling, so the screen and USB stay alive */
+#define FR_LO 0x97000u
+#define FR_HI 0xDA000u
+static struct { uint8_t on; uint32_t at; } fr;
+static void factory_start(void)
+{
+    seq_stop();
+    synth_panic();
+    fr.on = 1;
+    fr.at = FR_LO;
+}
+static int factory_step(void)            /* one sector, the screen; 1 while under way */
+{
+    if (!fr.on)
+        return 0;
+    while (fr.at < FR_HI) {              /* (a sector already empty: skipped) */
+        const uint32_t *d = (const uint32_t *)(const void *)plat_data(fr.at);
+        uint32_t i, used = 0;
+        for (i = 0; d && i < 1024u && !used; i++)
+            used = d[i] != 0xFFFFFFFFu;
+        if (used) {
+            plat_data_erase(fr.at);
+            fr.at += 4096u;
+            break;
+        }
+        fr.at += 4096u;
+    }
+    factory_screen((fr.at - FR_LO) * 1000u / (FR_HI - FR_LO));
+    if (fr.at >= FR_HI) {
+        settings_defaults();
+        prefs_defaults();
+        save_prefs();                    /* (seen_build 0: the next start says INSTALLED, as a fresh install) */
+        fr.on = 0;
+        plat_restart();
+    }
+    return 1;
+}
+
+/* an install begins (the installer's upgrade command): the sequencer stopped, the notes let go, and nullwave's own
+ * screen for a moment (the logo, INSTALLING) before fm1-base's steps and the FM-1's updater take the screen */
+int app_update_begin(void)
+{
+    static uint32_t t0;
+    uint32_t now = plat_ms();
+    if (!t0) {
+        t0 = now | 1u;
+        seq_stop();
+        synth_panic();
+        update_screen();
+    }
+    return now - t0 < 250u;              /* (a quarter second on the screen; fm1-base goes ahead at 300 ms anyway) */
+}
+
 
 /* ------------------------------------------------------------ companion --- */
 /* the computer's side (fm1.toml companion = true: docs/COMPANION.md): the saved settings are a file a page can
@@ -463,6 +613,81 @@ void app_file_changed(uint32_t obj)      /* the computer replaced the settings: 
 #ifdef PLAT_HOST
 int app_expect(const char *what, int *got)
 {
+#ifdef NW_HD
+    if (!strncmp(what, "hd:", 3)) {      /* the screen at 4x, to a file (hd.c) */
+        *got = hd_save(what + 3);
+        return 1;
+    }
+#endif
+    if (!strncmp(what, "why:", 4)) {      /* PLAY's red notice of why the channel is silent ("why:" none) */
+        const char *nm = silent_why(set.channel), *w = what + 4;
+        uint32_t k = 0;
+        nm = nm ? nm : "";
+        while (w[k] && nm[k] && (nm[k] == w[k] || (w[k] == '_' && nm[k] == ' ')))
+            k++;
+        *got = !w[k] && !nm[k];
+        return 1;
+    }
+    if (!strcmp(what, "transpose")) {    /* the song's TRANS (SEL) */
+        *got = song.transpose;
+        return 1;
+    }
+#ifdef PLAT_HOST
+    if (!strcmp(what, "prof")) {          /* the render's time by part since the last (printed), 1 */
+        static uint32_t since;
+        void synth_prof_dump(uint32_t real_ms);
+        synth_prof_dump(plat_ms() - since ? plat_ms() - since : 1u);
+        since = plat_ms();
+        *got = 1;
+        return 1;
+    }
+#endif
+    if (!strcmp(what, "budget_used")) {  /* the voices' weighed cost now (0.1 % of the FM-1's render time, synth.c) */
+        *got = (int)synth_budget_used();
+        return 1;
+    }
+    if (!strcmp(what, "load_est")) {     /* the FM-1's render load, estimated, %: the voices' cost, and ~20 % for the
+                                          * effects, the channels' filters and inserts, the mix (the host's measure x40) */
+        *got = (int)(synth_budget_used() / 10u) + 20;
+        return 1;
+    }
+    if (!strcmp(what, "draw_factory")) { /* a factory reset's screen, 42% (its pictures) */
+        factory_screen(420);
+        *got = 1;
+        return 1;
+    }
+    if (!strcmp(what, "draw_update")) {  /* the screen an install begins with, drawn now (its pictures) */
+        update_screen();
+        *got = 1;
+        return 1;
+    }
+    if (!strcmp(what, "installed")) {    /* INSTALLED on the screen now (a new build's first start) */
+        *got = !strcmp(ui.msg[0], "INSTALLED") && plat_ms() < ui.msg_until;
+        return 1;
+    }
+    if (!strcmp(what, "home_view")) {    /* SETTINGS SCREEN 2 HOME VIEW: 0 PLAY, 1 LOOP */
+        *got = prefs.home_view;
+        return 1;
+    }
+    if (!strcmp(what, "batt_pct")) {     /* the battery's percentage SYSTEM shows, -1 none (USB) */
+        *got = batt_pct();
+        return 1;
+    }
+    if (!strncmp(what, "layer_kept", 10)) {   /* a layer kept open (HOME tapped while it was held): its button */
+        *got = ui.layer_lock ? ui.layer : -1;
+        return 1;
+    }
+    if (!strncmp(what, "name:", 5) || !strncmp(what, "own:", 4) || (what[0] == 'u' && what[3] == ':')) {
+        /* name:X the channel's sound named X; own:X its own name X (a user preset's, "" none); uNN:X slot NN's */
+        const char *nm = what[0] == 'n' ? synth_preset_name(set.channel) : what[0] == 'o' ? synth_own_name(set.channel)
+                                        : user_name((uint32_t)((what[1] - '0') * 10 + what[2] - '0' + 31) % 32u);
+        const char *w = what + (what[0] == 'n' ? 5 : 4);
+        uint32_t k = 0;                  /* ('_' in the script: a space) */
+        while (w[k] && nm[k] && (nm[k] == w[k] || (w[k] == '_' && nm[k] == ' ')))
+            k++;
+        *got = !w[k] && !nm[k];
+        return 1;
+    }
     if (!strcmp(what, "octave"))
         *got = set.octave;
     else if (!strcmp(what, "channel"))
@@ -481,6 +706,14 @@ int app_expect(const char *what, int *got)
         *got = prefs.prs_mode;
     else if (!strcmp(what, "display"))       /* 0 dark, 1 light */
         *got = prefs.display;
+    else if (!strcmp(what, "named"))         /* the channels with a name: bit ch */
+    {
+        uint32_t ch;
+        *got = 0;
+        for (ch = 0; ch < NCH; ch++)
+            if (song.name[ch][0])
+                *got |= 1 << ch;
+    }
     else if (!strcmp(what, "mute"))          /* the channels muted, soloed: bit ch */
         *got = (int)seq_mute();
     else if (!strcmp(what, "solo"))
@@ -549,6 +782,16 @@ int app_expect(const char *what, int *got)
         *got = prefs.learn[0][0];
     else if (!strcmp(what, "quiet"))         /* the render's blocks done at no cost since the last ask, % */
         *got = (int)synth_quiet_pct();
+    else if (!strcmp(what, "logo"))          /* the boot animation playing */
+        *got = ui.logo_on;
+    else if (!strcmp(what, "fm_op"))         /* the FM6 operator the pages edit (0..5) */
+        *got = ui.fm_op;
+    else if (!strcmp(what, "fm_mutes"))      /* FM6: the operators muted, bit o */
+        *got = (int)synth_fm6_mutes(set.channel);
+    else if (!strcmp(what, "mono"))          /* VCE: 0 POLY, 1 MONO, 2 LEG, 3 UNI */
+        *got = synth_param(set.channel, SP_MONO);
+    else if (!strcmp(what, "glide"))
+        *got = synth_param(set.channel, SP_GLIDE);
     else if (!strcmp(what, "home_lit"))      /* HOME's light: on with MAIN on screen */
         *got = (int)(ui.lit >> B_HOME & 1u);
     else if (!strcmp(what, "replace"))       /* REC MODE: 1 REPLACE */
@@ -557,8 +800,28 @@ int app_expect(const char *what, int *got)
         *got = ui.step_page;
     else if (!strcmp(what, "fill"))          /* a fill playing (GLO + E4 held, or the next bar) */
         *got = seq_fill();
-    else if (!strcmp(what, "vis"))           /* the visualiser's style, 0 off */
-        *got = ui.vis;
+    else if (!strncmp(what, "mod_", 4)) {   /* mod_cut, mod_pit, mod_shp, mod_amp, mod_pan, mod_lfo: the size of the slots' sum now */
+        static const char *const T[MT_N] = {"off", "cut", "pit", "shp", "amp", "pan", "lfo"};
+        uint32_t d;
+        *got = 0;
+        for (d = 0; d < MT_N; d++)
+            if (!strcmp(what + 4, T[d]))
+                *got = synth_mod_now(set.channel, d) < 0 ? -synth_mod_now(set.channel, d) : synth_mod_now(set.channel, d);
+    }
+    else if (!strncmp(what, "slot", 4))     /* slotN: mod slot N's amount (1..4) on the selected channel */
+        *got = synth_mod(set.channel)->m[(atoi(what + 4) + 3) % SYN_MODS].amt;
+    else if (!strcmp(what, "render_permille")) {   /* the host's render time against the blocks' real time, since asked */
+        *got = rd_budget ? (int)(rd_ticks * 1000u / rd_budget) : 0;
+        rd_ticks = rd_budget = 0;
+    }
+    else if (!strcmp(what, "draw_us")) {     /* the host's time a frame's drawing took, on average, since asked last */
+        *got = draw_n ? (int)(draw_ns / draw_n / 1000u) : 0;
+        draw_ns = draw_n = 0;
+    }
+    else if (!strcmp(what, "view"))          /* MAIN: 0 PLAY, 1 LOOP */
+        *got = ui.loop;
+    else if (!strcmp(what, "prow"))          /* PLAY: the first channel of the four shown, 0..2 */
+        *got = ui.pv_top;
     else if (!strcmp(what, "graph"))     /* the graph shown: 0 none, else its kind (ui.c GR_*) */
         *got = (int32_t)graph_now();
     else if (!strcmp(what, "tune"))
@@ -574,3 +837,294 @@ int app_expect(const char *what, int *got)
     return 1;
 }
 #endif
+
+
+/* -------------------------------------------------------------- the editor --- */
+/* (docs/EDITOR-PROTOCOL.md) The preset file, version 1, little-endian:
+ *   u32 magic "NWPR", u8 version 1, u8 engine, u8 flags (bit 0 play it on the selected channel, bit 1 keep it in user
+ *   slot SLOT; reading gives 1), u8 slot 0..31, u8 name length 0..16, 16 bytes the name (padded with 0), u8 n, n x
+ *   (u16 id, i16 value) the sound's values by parameter id (synth.h SP_*: the engine's eight, the envelope, the filter,
+ *   the LFO, the sends, ENV 2 and the four mod slots; an id this firmware does not know is skipped, one left out keeps
+ *   the engine preset's value), u8 has FM6 patch, then its 96 bytes when 1.
+ * A value by id, not a struct: a sound saved by one firmware loads in the next, whatever it added. */
+#define PRESET_MAGIC 0x5250574Eu         /* "NWPR" */
+#define PRESET_VER 1u
+#define PRESET_MAX 640u
+static uint8_t pre_buf[PRESET_MAX], pre_in[PRESET_MAX];
+static uint32_t pre_n, pre_w;            /* the sound as a file (read), the bytes of a write under way (pre_in) */
+
+/* the parameters the editor sees (and a preset carries), each with its group */
+enum { PG_OSC, PG_FILTERG, PG_ENVG, PG_LFOG, PG_FXG, PG_MODG, PG_NGROUPS };
+static const struct { uint16_t id; uint8_t group; } EDP[] = {
+    {SP_E0, PG_OSC}, {SP_E1, PG_OSC}, {SP_E2, PG_OSC}, {SP_E3, PG_OSC},
+    {SP_E4, PG_OSC}, {SP_E5, PG_OSC}, {SP_E6, PG_OSC}, {SP_E7, PG_OSC},   /* (EDIT 2: filter on ANALOG and SUPER) */
+    {SP_MONO, PG_OSC}, {SP_GLIDE, PG_OSC},
+    {SP_FLT, PG_FILTERG}, {SP_CUT, PG_FILTERG}, {SP_RES, PG_FILTERG}, {SP_TFILT, PG_FILTERG}, {SP_FTYPE, PG_FILTERG},
+    {SP_ATK, PG_ENVG}, {SP_DEC, PG_ENVG}, {SP_SUS, PG_ENVG}, {SP_REL, PG_ENVG},
+    {SP_FENV, PG_ENVG}, {SP_PENV, PG_ENVG}, {SP_SENV, PG_ENVG},
+    {SP_E2_ATK, PG_ENVG}, {SP_E2_DEC, PG_ENVG}, {SP_E2_SUS, PG_ENVG}, {SP_E2_REL, PG_ENVG},
+    {SP_LFO_RATE, PG_LFOG}, {SP_LFO_WAVE, PG_LFOG}, {SP_LFO_PHASE, PG_LFOG}, {SP_LFO_FADE, PG_LFOG},
+    {SP_LFO_SYNC, PG_LFOG}, {SP_LFO_TRIG, PG_LFOG}, {SP_LFO_POL, PG_LFOG},
+    {SP_LFO_PIT, PG_LFOG}, {SP_LFO_FLT, PG_LFOG}, {SP_LFO_SHP, PG_LFOG}, {SP_LFO_AMP, PG_LFOG},
+    {SP_DST, PG_FXG}, {SP_CHO, PG_FXG}, {SP_DLY, PG_FXG}, {SP_REV, PG_FXG}, {SP_PAN, PG_FXG},
+    {SP_M1_SRC, PG_MODG}, {SP_M1_DST, PG_MODG}, {SP_M1_AMT, PG_MODG}, {SP_M2_SRC, PG_MODG}, {SP_M2_DST, PG_MODG},
+    {SP_M2_AMT, PG_MODG}, {SP_M3_SRC, PG_MODG}, {SP_M3_DST, PG_MODG}, {SP_M3_AMT, PG_MODG}, {SP_M4_SRC, PG_MODG},
+    {SP_M4_DST, PG_MODG}, {SP_M4_AMT, PG_MODG},
+};
+#define NEDP ((uint32_t)(sizeof EDP / sizeof EDP[0]))
+#define EDP_ENGINE 1000u                 /* (the engine: a parameter of its own id) */
+#define EDP_WAVE 1001u                   /* (read only: the oscillator type now, WAVE_NAMES) */
+#define EDP_SHAPE 1002u                  /* (read only: the shape now, 0..127, with its modulation) */
+static const char *const ENGINE_NAMES[] = {"ANALOG", "FM6", "PHASE", "LOFI", "SAMPLE", "VOICE", "TRIO", "WHEEL",
+                                           "GRAIN", "PHYS", "NOISE", "SLICE", "DRUM", "SUPER"};
+/* every oscillator type, for the editor to draw (docs/EDITOR-PROTOCOL.md, "waveform hints") */
+static const char *const WAVE_NAMES[] = {"SAW", "SQR", "TRI", "SIN", "PWM", "SYNC", "SUB", "SUPERSAW", "SUPERSQR",
+                                         "SUPERTRI", "PULSE", "MORPH", "FM", "PD", "CHIP", "SAMPLE", "FORMANT", "TRIO",
+                                         "ORGAN", "GRAIN", "MODAL", "NOISE", "SLICE", "KIT"};
+static int32_t wave_now(uint32_t ch)
+{
+    static const int8_t OTHER[14] = {-1, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, -1};
+    uint32_t e = synth_sound(ch)->engine;
+    int32_t w = synth_param(ch, SP_E0);
+    if (e == 0u)                         /* ANALOG: SAW SQR TRI SIN PWM SYNC SUB, as they are */
+        return clamp(w, 0, 6);
+    if (e == 13u)                        /* SUPER: SAW SQR TRI stacks, PULSE, SYNC, MORPH */
+        return w <= 2 ? 7 + w : w == 3 ? 10 : w == 4 ? 5 : 11;
+    return e < 14u ? OTHER[e] : 0;
+}
+
+int app_param(uint32_t i, plat_param_t *p)
+{
+    uint32_t ch = set.channel;
+    int32_t lo, hi;
+    memset(p, 0, sizeof *p);
+    if (i < NEDP) {
+        uint32_t id = EDP[i].id;
+        const char *const *names = synth_param_names(ch, id);
+        synth_param_range(ch, id, &lo, &hi);
+        p->id = (uint16_t)id;
+        p->type = names ? PLAT_PT_ENUM : PLAT_PT_NUMBER;
+        p->group = EDP[i].group;
+        if (id >= SP_E4 && id <= SP_E7 && synth_page_title(ch, 1)[0] == 'F')   /* (EDIT 2 a filter: its group) */
+            p->group = PG_FILTERG;
+        p->min = lo;
+        p->max = hi;
+        p->def = synth_param_default(ch, id);
+        p->name = synth_param_label(ch, id);
+        p->labels = names;
+        return 0;
+    }
+    switch (i - NEDP) {
+    case 0: p->id = EDP_ENGINE; p->type = PLAT_PT_ENUM; p->group = PG_OSC; p->max = 13; p->name = "ENGINE";
+        p->labels = ENGINE_NAMES; return 0;
+    case 1: p->id = EDP_WAVE; p->type = PLAT_PT_ENUM; p->group = PG_OSC; p->max = 23; p->name = "WAVEFORM";
+        p->labels = WAVE_NAMES; p->flags = PLAT_PA_READONLY; return 0;
+    case 2: p->id = EDP_SHAPE; p->type = PLAT_PT_NUMBER; p->group = PG_OSC; p->max = 127; p->def = 64; p->name = "SHAPE NOW";
+        p->flags = PLAT_PA_READONLY; return 0;
+    default: return -1;
+    }
+}
+const char *app_param_group(uint32_t g)
+{
+    static const char *const G[PG_NGROUPS] = {"osc", "filter", "env", "lfo", "fx", "mod"};
+    return g < PG_NGROUPS ? G[g] : 0;
+}
+int32_t app_param_get(uint32_t i)
+{
+    uint32_t ch = set.channel;
+    if (i < NEDP)
+        return synth_param(ch, EDP[i].id);
+    switch (i - NEDP) {
+    case 0: return synth_sound(ch)->engine;
+    case 1: return wave_now(ch);
+    case 2: return clamp(synth_param(ch, SP_E3) + (synth_mod_now(ch, MT_SHP) >> 9), 0, 127);
+    default: return 0;
+    }
+}
+int32_t app_param_set(uint32_t i, int32_t v)
+{
+    uint32_t ch = set.channel;
+    if (i < NEDP) {
+        synth_param_set(ch, EDP[i].id, v);
+        seq_touch();
+    } else if (i == NEDP) {
+        synth_engine(ch, (uint32_t)clamp(v, 0, 13));
+        seq_touch();
+    }
+    return app_param_get(i);
+}
+
+static uint32_t preset_make(uint32_t ch, uint8_t *b)   /* the channel's sound as a preset file: its size */
+{
+    uint32_t n = 0, i, k = 0;
+    const char *nm = synth_preset_name(ch);
+    uint32_t magic = PRESET_MAGIC;
+    memcpy(b, &magic, 4);
+    b[4] = PRESET_VER;
+    b[5] = (uint8_t)synth_sound(ch)->engine;
+    b[6] = 1;
+    b[7] = 0;
+    while (nm[k] && k < 16u)
+        k++;
+    b[8] = (uint8_t)k;
+    memset(b + 9, 0, 16);
+    memcpy(b + 9, nm, k);
+    n = 26;
+    for (i = 0; i < NEDP; i++) {
+        int16_t v = (int16_t)synth_param(ch, EDP[i].id);
+        uint16_t id = EDP[i].id;
+        memcpy(b + n, &id, 2);
+        memcpy(b + n + 2, &v, 2);
+        n += 4;
+    }
+    b[25] = (uint8_t)NEDP;
+    b[n++] = synth_sound(ch)->engine == 1u;
+    if (b[n - 1]) {
+        memcpy(b + n, synth_fm6_own(ch), SYN_FM6_BYTES);
+        n += SYN_FM6_BYTES;
+    }
+    return n;
+}
+
+static int preset_take(const uint8_t *b, uint32_t size, uint32_t ch)   /* a preset file played on ch (and kept): 0 ok */
+{
+    uint32_t magic, i, n, at;
+    if (size < 27u)
+        return -1;
+    memcpy(&magic, b, 4);
+    if (magic != PRESET_MAGIC || b[4] < 1u || b[5] >= synth_nengines() || b[8] > 16u)
+        return -1;                       /* (a later version: the fields it adds come after these; this one reads on) */
+    n = b[25];
+    if (26u + n * 4u + 1u > size)
+        return -1;
+    synth_engine(ch, b[5]);              /* the engine at its first preset, then the values the file gives */
+    for (i = 0, at = 26; i < n; i++, at += 4u) {
+        uint16_t id;
+        int16_t v;
+        memcpy(&id, b + at, 2);
+        memcpy(&v, b + at + 2, 2);
+        if (id < SP_N)
+            synth_param_set(ch, id, v);
+    }
+    if (b[at] == 1u && at + 1u + SYN_FM6_BYTES <= size)
+        memcpy(synth_fm6_own(ch), b + at + 1, SYN_FM6_BYTES);
+    if (b[8])                            /* (its name: on the screen, kept with it in a user slot) */
+        synth_set_name(ch, (const char *)b + 9, b[8]);
+    seq_touch();
+    if (b[6] & 2u) {                     /* kept in a user slot (while stopped) */
+        if (!user_save(b[7] % 32u, ch)) {
+            app_say("PRESET", "STOP FIRST");
+            return 0;
+        }
+        {
+            char t[8] = "USER ";
+            t[5] = (char)('0' + (b[7] % 32u + 1u) / 10u);
+            t[6] = (char)('0' + (b[7] % 32u + 1u) % 10u);
+            t[7] = 0;
+            app_say("PRESET SAVED", t);
+        }
+    } else
+        app_say("PRESET", "FROM THE EDITOR");
+    return 0;
+}
+
+/* the app's own files: 0 "preset" (the editor's), 1..8 "song-a".."song-h" (read: a backup before a factory reset),
+ * 9 "user-presets", 10 "fm6-bank" (read), 11 "factory-reset" (write the words FR_WORDS: everything nullwave keeps
+ * erased, then a restart) */
+#define FR_WORDS "nullwave factory reset"
+enum { AF_PRESET, AF_SONG, AF_USERS = AF_SONG + NSONG, AF_BANK, AF_FACTORY, AF_N };
+static const char *const SONG_FILE[NSONG] = {"song-a", "song-b", "song-c", "song-d", "song-e", "song-f", "song-g",
+                                              "song-h"};
+static const uint8_t *af_raw(uint32_t i, uint32_t *size)   /* a read-only file's bytes in the flash, its size */
+{
+    uint32_t ver;
+    const uint8_t *d = 0;
+    *size = 0;
+    if (i >= AF_SONG && i < AF_SONG + NSONG)
+        d = slot_data(i - AF_SONG, size, &ver);
+    else if (i == AF_USERS || i == AF_BANK) {
+        uint32_t k, n = i == AF_USERS ? 8192u : 4096u, used = 0;
+        d = plat_data(i == AF_USERS ? USER_BASE : FMBANK_BASE);
+        for (k = 0; d && k < n && !used; k++)
+            used = d[k] != 0xFFu;
+        *size = used ? n : 0u;
+    }
+    return d;
+}
+int app_file(uint32_t i, plat_file_info_t *f)
+{
+    if (i >= AF_N)
+        return -1;
+    if (i == AF_PRESET) {
+        pre_n = preset_make(set.channel, pre_buf);
+        f->name = "preset";
+        f->kind = PLAT_FK_PRESET;
+        f->flags = PLAT_FF_READ | PLAT_FF_WRITE | PLAT_FF_PLAYING;   /* (heard while playing too; kept only stopped) */
+        f->size = pre_n;
+        f->room = PRESET_MAX;
+        return 0;
+    }
+    if (i == AF_FACTORY) {
+        f->name = "factory-reset";
+        f->kind = PLAT_FK_OTHER;
+        f->flags = PLAT_FF_WRITE | PLAT_FF_PLAYING;   /* (it stops the sequencer itself) */
+        f->size = 0;
+        f->room = 32;
+        return 0;
+    }
+    af_raw(i, &f->size);
+    f->name = i == AF_USERS ? "user-presets" : i == AF_BANK ? "fm6-bank" : SONG_FILE[i - AF_SONG];
+    f->kind = i == AF_BANK ? PLAT_FK_BANK : i == AF_USERS ? PLAT_FK_PRESET : PLAT_FK_PROJECT;
+    f->flags = PLAT_FF_READ;
+    f->room = i == AF_USERS ? 8192u : i == AF_BANK ? 4096u : SONG_SIZE;
+    return 0;
+}
+int app_file_read(uint32_t i, uint32_t off, uint8_t *dst, uint32_t n)
+{
+    uint32_t size;
+    const uint8_t *d;
+    if (i == AF_PRESET) {
+        if (off + n > pre_n)
+            return -1;
+        memcpy(dst, pre_buf + off, n);
+        return 0;
+    }
+    d = af_raw(i, &size);
+    if (!d || off + n > size)
+        return -1;
+    memcpy(dst, d + off, n);
+    return 0;
+}
+int app_file_begin(uint32_t i, uint32_t size)
+{
+    pre_w = 0;
+    return (i == AF_PRESET && size <= PRESET_MAX) || (i == AF_FACTORY && size <= 32u) ? 0 : -1;
+}
+int app_file_write(uint32_t i, uint32_t off, const uint8_t *src, uint32_t n)
+{
+    if ((i != AF_PRESET && i != AF_FACTORY) || off != pre_w || off + n > PRESET_MAX)
+        return -1;
+    memcpy(pre_in + off, src, n);
+    pre_w += n;
+    return 0;
+}
+int app_file_commit(uint32_t i, uint32_t size, uint32_t crc)
+{
+    (void)crc;                           /* (the platform checked it) */
+    if (size != pre_w)
+        return -1;
+    if (i == AF_FACTORY) {               /* (the words exactly: nothing else erases anything) */
+        uint32_t k;
+        if (size != sizeof FR_WORDS - 1u)
+            return -1;
+        for (k = 0; k < size; k++)       /* (no memcmp on the device) */
+            if (pre_in[k] != (uint8_t)FR_WORDS[k])
+                return -1;
+        factory_start();
+        return 0;
+    }
+    if (i != AF_PRESET)
+        return -1;
+    return preset_take(pre_in, size, set.channel);
+}
+int app_file_delete(uint32_t i) { (void)i; return -1; }

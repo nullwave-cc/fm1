@@ -60,8 +60,8 @@ expect note 53
 key 0 up
 # a DRUM channel's keys: GM notes, C4 the kick (36), D4 the snare (38), F#4 the closed hat (42),
 # F3 the low floor tom (41, as F4); the octave leaves them alone
-turn ALGO -1
-expect channel 0
+turn ALGO -2
+expect channel 5
 key 7 down 100
 wait 30
 expect note 36

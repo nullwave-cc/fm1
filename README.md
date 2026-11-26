@@ -10,14 +10,17 @@
 A groovebox firmware for the M-VAVE FM-1, with six equal channels. Any channel can be a synth, a drum kit, a
 sampler or a MIDI output, and all six share one pool of voices, so there is no fixed drum track.
 
-**Status: early development.** Nothing here is ready to install yet.
+**Version 0.1.0** will be the first public release; this is its development build. Install it from the browser at
+[nullwave.cc/fm1/installer](https://nullwave.cc/fm1/installer/), then follow the
+[quick start](https://nullwave.cc/fm1/quick-start/). The [manual](app/docs/MANUAL.md) is the full reference, and
+[CHANGELOG.md](CHANGELOG.md) lists what is in each version.
 
 ## Plan for 1.0
 
 - Six channels, each with its own sequencer (patterns of 1 to 8 bars, its own length, time signature and step
   size), mix strip, sidechain and MIDI channel. Patterns chain into songs.
-- Engines: ANALOG, LOFI, TRIO, WHEEL, NOISE and PHASE (Felucca-Engines), plus FM, sample and slice, drum, wavetable,
-  formant voice, granular and physical models.
+- Engines: ANALOG, LOFI, TRIO, WHEEL, NOISE and PHASE (Felucca-Engines), plus FM, supersaw stacks, sample and slice,
+  drum, wavetable, formant voice, granular and physical models, with a second envelope and four mod slots on each.
 - Shared tape delay and reverb, drive, fold and bitcrush per channel, a master compressor and limiter.
 - Scales on the keys: every key glows faintly, scale keys brighter, roots lit.
 - An audio looper that records the internal mix.
@@ -44,7 +47,8 @@ sampler or a MIDI output, and all six share one pool of voices, so there is no f
 
 ## Install
 
-See [docs/INSTALL.md](docs/INSTALL.md). Back up the FM-1 first.
+From the browser: [nullwave.cc/fm1/installer](https://nullwave.cc/fm1/installer/). From a terminal, or to go back to
+the stock firmware: [docs/INSTALL.md](docs/INSTALL.md). Back up the FM-1 first.
 
 ## Licence
 

@@ -1,0 +1,86 @@
+# REPLACE (SHIFT + REC): a pass silences the last take while it records; a full pass is the new take; stopped short,
+# the last full take stays untouched ("KEPT LAST TAKE"). One pattern, no copy: the pass's notes are marked
+wait 1800
+# a take of two notes on channel 1, OVERDUB (stopped: armed, the first note starts the loop)
+tap REC
+wait 50
+key 0 down 100
+wait 100
+key 0 up
+wait 400
+key 4 down 100
+wait 100
+key 4 up
+wait 4300
+tap REC
+wait 100
+expect events 2
+# REPLACE, a pass stopped short: the take as it was
+press OCT-
+wait 30
+tap REC
+wait 30
+release OCT-
+expect replace 1
+listen
+tap REC
+wait 50
+expect rec 4
+key 7 down 100
+wait 100
+key 7 up
+wait 600
+tap REC
+wait 100
+said KEPT LAST TAKE
+expect events 2
+# a full pass: three new notes, the take
+tap REC
+wait 50
+key 9 down 100
+key 11 down 100
+key 12 down 100
+wait 100
+key 9 up
+key 11 up
+key 12 up
+wait 4300
+tap REC
+wait 100
+expect events 3
+# the general undo (EDIT + OCT-): back to before that recording, and redo (EDIT + OCT+)
+press EDIT
+wait 30
+tap OCT-
+wait 30
+tap OCT+
+wait 30
+release EDIT
+wait 30
+expect events 3
+press EDIT
+wait 30
+tap OCT-
+wait 30
+release EDIT
+wait 30
+expect events 2
+press EDIT
+wait 30
+tap OCT+
+wait 30
+release EDIT
+wait 30
+expect events 3
+# a channel change stops a pass short too
+tap REC
+wait 50
+key 2 down 100
+wait 100
+key 2 up
+turn ALGO 1
+wait 50
+expect rec 0
+turn ALGO -1
+expect events 3
+tap PLAY

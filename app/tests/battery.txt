@@ -1,0 +1,12 @@
+# SETTINGS > SYSTEM: BATTERY next to CPU, the reading as a percentage (the host's: full, 100 %), USB or CHARGING when
+# 5 V is there. Run by tests/run_tests.sh:
+#   app/build/host/nullwave_host app/tests/battery.txt app/build/host
+wait 1800
+press HOME
+wait 900
+release HOME
+wait 50
+turn SELECT 5
+wait 300
+expect page 30
+expect batt_pct 100

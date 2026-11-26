@@ -19,7 +19,8 @@ enum { PG_HOME, PG_ENV, PG_FX, PG_FILTER, PG_DELAY, PG_REVERB, PG_KEY, PG_KEY2, 
        PG_M_SCREEN, PG_M_LIGHTS, PG_M_SYSTEM,
        PG_ENVDEST, PG_LFO, PG_LFO2, PG_LFODEST, PG_SLICER, PG_INSERT, PG_INSERT2, PG_AFILTER, PG_VOICE2,
        PG_FM_OP, PG_FM_ENV, PG_FM_OP2, PG_LANES, PG_LANES2, PG_ARP, PG_ARP2, PG_TEXTURE, PG_TEXTURE2,
-       PG_PRESETS, PG_USER, PG_TOOLS, PG_M_AUDIO, PG_M_SEQ, PG_NOTES, PG_DGRID, NPG };                        /* HOME held: the menu */
+       PG_PRESETS, PG_USER, PG_TOOLS, PG_M_AUDIO, PG_M_SEQ, PG_NOTES, PG_DGRID, PG_PITCH,
+       PG_NAME, PG_M_SCREEN2, PG_ENV2, PG_MOD1, PG_MOD2, PG_MOD3, PG_MOD4, PG_M_SYSTEM2, NPG };   /* ENV 2, the mod slots */   /* NAME: SHIFT + SAVE, the channel's name */                        /* HOME held: the menu */
 /* the page groups that are no button's own: nullwave's settings, the menu */
 enum { G_CONF = NB, G_MENU, NGROUP };
 
@@ -49,7 +50,10 @@ enum {
     KN_FM_MODE, KN_FM_DTUN, KN_FM_VEL, KN_VMUTE, KN_PFADE,
     KN_PRE_SOUND, KN_PRE_ENGINE, KN_PRE_FAV, KN_USLOT, KN_ULOAD, KN_UERASE, KN_USAVE, KN_CLRSQ, KN_INIT,
     KN_LOWCUT, KN_USBA, KN_RESO, KN_STEPADV, KN_DRPREV, KN_RREPL,
-    KN_NSEL, KN_NPITCH, KN_NMOVE, KN_NLEN, KN_DLANE, KN_DSTEP, KN_DHIT, KN_DVEL, KN_N
+    KN_NSEL, KN_NPITCH, KN_NMOVE, KN_NLEN, KN_DLANE, KN_DSTEP, KN_DHIT, KN_DVEL,
+    KN_NMCUR, KN_NMCHR, KN_NMPRE, KN_NMCLR,
+    KN_HOMEVIEW, KN_AUTOLOOP, KN_FACTORY, KN_BATT,             /* SETTINGS SCREEN 2: MAIN's view at power-on; REC shows LOOP */   /* NAME: the cursor, its character, a ready name, clear */
+    KN_N
 };
 
 static const char *const PAGE_TITLE[NPG] = {"MAIN", "ENV", "FX", "FILTER", "DELAY", "REVERB", "KEY", "KEY 2",
@@ -59,7 +63,7 @@ static const char *const PAGE_TITLE[NPG] = {"MAIN", "ENV", "FX", "FILTER", "DELA
                                             "ENV DEST", "LFO", "LFO 2", "LFO DEST", "SLICER", "INSERT", "INSERT 2",
                                             "FILTER", "VOICE 2", "OPERATOR", "OP ENV", "OPERATOR 2", "LANES",
                                             "LANES 2", "ARP", "ARP 2", "TEXTURE", "TEXTURE 2", "PRESETS", "USER",
-                                            "TOOLS", "AUDIO", "SEQ", "NOTES", "DRUMS"};
+                                            "TOOLS", "AUDIO", "SEQ", "NOTES", "DRUMS", "PITCH", "NAME", "SCREEN 2", "ENV 2", "MOD 1", "MOD 2", "MOD 3", "MOD 4", "SYSTEM 2"};
 static const uint16_t PAGE_KN[NPG][4] = {
     [PG_HOME] = {KN_SWING, KN_LEVEL, KN_BARS, KN_SP + SP_PAN},
     [PG_ENV] = {KN_SP + SP_ATK, KN_SP + SP_DEC, KN_SP + SP_SUS, KN_SP + SP_REL},
@@ -100,6 +104,14 @@ static const uint16_t PAGE_KN[NPG][4] = {
     [PG_M_SEQ] = {KN_STEPADV, KN_DRPREV, KN_LAUNCH, KN_RREPL},
     [PG_NOTES] = {KN_NSEL, KN_NPITCH, KN_NMOVE, KN_NLEN},
     [PG_DGRID] = {KN_DLANE, KN_DSTEP, KN_DHIT, KN_DVEL},
+    [PG_PITCH] = {KN_SP + SP_PENV, KN_SP + SP_LFO_PIT, KN_TRANS, KN_SP + SP_GLIDE},
+    [PG_NAME] = {KN_NMCUR, KN_NMCHR, KN_NMPRE, KN_NMCLR},
+    [PG_M_SCREEN2] = {KN_HOMEVIEW, KN_AUTOLOOP, KN_NONE, KN_NONE},
+    [PG_ENV2] = {KN_SP + SP_E2_ATK, KN_SP + SP_E2_DEC, KN_SP + SP_E2_SUS, KN_SP + SP_E2_REL},
+    [PG_MOD1] = {KN_SP + SP_M1_SRC, KN_SP + SP_M1_DST, KN_SP + SP_M1_AMT, KN_NONE},
+    [PG_MOD2] = {KN_SP + SP_M2_SRC, KN_SP + SP_M2_DST, KN_SP + SP_M2_AMT, KN_NONE},
+    [PG_MOD3] = {KN_SP + SP_M3_SRC, KN_SP + SP_M3_DST, KN_SP + SP_M3_AMT, KN_NONE},
+    [PG_MOD4] = {KN_SP + SP_M4_SRC, KN_SP + SP_M4_DST, KN_SP + SP_M4_AMT, KN_NONE},
     [PG_SYSTEM] = {KN_NONE, KN_NONE, KN_NONE, KN_NONE},
     [PG_DRUMS] = {KN_DR_LVL, KN_DR_REV, KN_DR_DLY, KN_NONE},
     [PG_MIDI] = {KN_MIDI + 0, KN_MIDI + 1, KN_MIDI + 2, KN_MIDI + 3},
@@ -112,20 +124,22 @@ static const uint16_t PAGE_KN[NPG][4] = {
     [PG_C_SCENE] = {KN_NONE, KN_NONE, KN_NONE, KN_NONE},
     [PG_M_SCREEN] = {KN_DISPLAY, KN_ACCEL, KN_GRAPHS, KN_NONE},
     [PG_M_LIGHTS] = {KN_LIGHTS, KN_SCALEKEYS, KN_NONE, KN_NONE},
-    [PG_M_SYSTEM] = {KN_ABOUT, KN_AUTOSAVE, KN_CPU, KN_NONE},
+    [PG_M_SYSTEM] = {KN_ABOUT, KN_AUTOSAVE, KN_CPU, KN_BATT},
+    [PG_M_SYSTEM2] = {KN_FACTORY, KN_NONE, KN_NONE, KN_NONE},
     [PG_SONG] = {KN_SLOT, KN_LOAD, KN_SAVE, KN_NEW},
     [PG_SCENE] = {KN_SCN, KN_SCN_CH, KN_SCN_PAT, KN_SCN_SND},
     [PG_CHAIN] = {KN_CS, KN_CS_SCENE, KN_CS_BARS, KN_CS_REPS},
     [PG_REC] = {KN_RMODE, KN_RBARS, KN_RSTART, KN_RQUANT},
 };
 /* each button's pages, in the order SELECT and a second tap turn them (-1: the end) */
-#define GMAX 13
+#define GMAX 14
 static const int8_t GROUP[NGROUP][GMAX] = {
     [B_FX] = {PG_FX, PG_FILTER, PG_SLICER, PG_INSERT, PG_INSERT2, PG_DELAY, PG_REVERB, -1},
     [B_SEL] = {PG_KEY, PG_KEY2, -1},
-    [B_ENV] = {PG_ENV, PG_ENVDEST, -1},  [B_LFO] = {PG_LFO, PG_LFO2, PG_LFODEST, -1},
+    [B_ENV] = {PG_ENV, PG_ENVDEST, PG_ENV2, -1},
+    [B_LFO] = {PG_LFO, PG_LFO2, PG_LFODEST, PG_MOD1, PG_MOD2, PG_MOD3, PG_MOD4, -1},
     [B_EDIT] = {PG_EDIT1, PG_EDIT2, PG_AFILTER, PG_FM_OP, PG_FM_ENV, PG_FM_OP2, PG_LANES, PG_LANES2, PG_VOICE,
-                PG_VOICE2, -1},
+                PG_VOICE2, PG_PITCH, -1},
     [B_GLO] = {PG_GLOBAL, PG_MASTER, PG_TEXTURE, PG_TEXTURE2, PG_DRUMS, -1},   /* the song's */
     [B_HOME] = {PG_HOME, -1},
     [B_SAVE] = {PG_PRESETS, PG_USER, PG_SONG, PG_SCENE, PG_CHAIN, PG_TOOLS, -1},
@@ -134,14 +148,14 @@ static const int8_t GROUP[NGROUP][GMAX] = {
     [G_CONF] = {-1},
     /* SETTINGS (HOME held, SHIFT + GLO): the FM-1's own, each once, in groups of pages */
     /* (SCREEN, LIGHTS, AUDIO, SEQ, SYSTEM, then MIDI, KEYS, BLUETOOTH) */
-    [G_MENU] = {PG_M_SCREEN, PG_M_LIGHTS, PG_M_AUDIO, PG_M_SEQ, PG_M_SYSTEM, PG_MIDI, PG_MIDI56, PG_MIDI2, PG_MIDI3,
+    [G_MENU] = {PG_M_SCREEN, PG_M_SCREEN2, PG_M_LIGHTS, PG_M_AUDIO, PG_M_SEQ, PG_M_SYSTEM, PG_M_SYSTEM2, PG_MIDI, PG_MIDI56, PG_MIDI2, PG_MIDI3,
                 PG_C_KEYS, PG_C_BT, -1},
 };
 static const char *set_group(uint32_t pg)   /* a SETTINGS page's group */
 {
     switch (pg) {
     case PG_C_KEYS: return "KEYS";
-    case PG_M_SCREEN: return "SCREEN";
+    case PG_M_SCREEN: case PG_M_SCREEN2: return "SCREEN";
     case PG_M_LIGHTS: return "LIGHTS";
     case PG_M_AUDIO: return "AUDIO";
     case PG_MIDI: case PG_MIDI56: case PG_MIDI2: case PG_MIDI3: return "MIDI";
@@ -198,15 +212,26 @@ static struct {
     uint32_t down_t[NB];                 /* when each button went down */
     uint8_t used[NB];                    /* something else was done while it was held */
     uint8_t oct_used;
+    uint32_t fr_arm, fr_hold;            /* FACTORY RESET: armed (when), PLAY held since (0 not) */
     uint8_t fm_op, fm_stage, uslot;      /* FM6's operator and stage on its pages; SAVE USER's slot */
     uint8_t vl_center;                   /* VLEAD: the last chord's middle */
     uint8_t learn;                       /* MIDI LEARN: 1 waiting for a knob, 2 for a CC */
     uint16_t learn_kn;
     uint8_t nsel, dlane, dstep;
     uint32_t lit;                        /* the buttons lit (the tests) */
-    int8_t save_key;                     /* SAVE held: the scene key down (-1 none), since save_t */
+    uint8_t logo_on;                     /* the boot animation playing (any key, button or knob ends it) */
+    uint32_t logo_t0, logo_drawn;
+    int8_t save_key;
+    int8_t edit_key;                     /* EDIT held: the black key down (its legend's job on release), since edit_t */
+    uint32_t edit_t;                     /* SAVE held: the scene key down (-1 none), since save_t */
     uint32_t save_t;
-    uint8_t vis;                         /* HOME tapped on MAIN: the visualiser, 0 off, 1 BARS, 2 RINGS, 3 SCOPE */          /* NOTES: the note picked (in time order); DRUMS: the lane and step */
+    char name[SONG_NAME + 1];            /* NAME: the name being edited, space-padded, for channel name_ch */
+    uint8_t loop, loop_auto;             /* MAIN's channels: 0 PLAY, 1 LOOP (SHIFT + HOME); LOOP put up by PLAY / REC */
+    uint8_t loop_user;                   /* SHIFT + HOME while playing: the view as chosen till the transport stops */
+    uint8_t pv_top;                      /* PLAY and LOOP: the first of the four channels shown, 0..2 */
+    int16_t pv_y;                        /* where the list is drawn from, in 1/8 px (it slides to pv_top) */
+    uint32_t pulse_t[NCH];               /* PLAY: when each channel last struck a note (its dot flashes) */
+    uint8_t name_ch, name_cur, name_pre;  /* its channel, the cursor, the last ready name picked (0 none) */          /* NOTES: the note picked (in time order); DRUMS: the lane and step */
     uint8_t step_page;                   /* SEQ: the steps the keys show (16 a page) */
     int16_t held_step;                   /* SEQ: the step held, -1 none */
     uint8_t step_new, step_turned;       /* it was set by this press; a knob moved it */
@@ -266,6 +291,25 @@ static void copy_text(char *d, const char *s, uint32_t n)
     d[i] = 0;
 }
 
+static void batt_text(char *out)         /* SYSTEM's BATTERY: "80%", USB, CHARGING */
+{
+    int32_t p = batt_pct();
+#ifdef APP_BATTERY_RAW
+    if (p < 0) {
+        copy_text(out, plat_battery_charging() == 2 ? "CHARGING" : "USB", 9);
+        return;
+    }
+#else
+    if (p < 0) {
+        copy_text(out, "USB", 9);
+        return;
+    }
+#endif
+    int_text(p, out);
+    text_cat(out, "%");
+}
+
+
 static const char *const NOTE_NAME[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 static void note_text(int32_t note, char *b)
 {
@@ -307,6 +351,25 @@ static void channel_text(uint32_t ch, char *t)   /* "CH 1" */
     t[4] = 0;
 }
 
+/* a channel's name: the song's (SHIFT + SAVE), trailing spaces off; "" none */
+static const char *chan_given(uint32_t ch)
+{
+    static char t[NCH][SONG_NAME + 1];
+    uint32_t i, n = 0;
+    ch %= NCH;
+    for (i = 0; i < SONG_NAME && song.name[ch][i]; i++)
+        if ((t[ch][i] = song.name[ch][i]) != ' ')
+            n = i + 1u;
+    t[ch][n] = 0;
+    return t[ch];
+}
+/* what names a channel on the screen: its name, else its engine's */
+static const char *chan_name(uint32_t ch)
+{
+    const char *n = chan_given(ch);
+    return n[0] ? n : synth_engine_name(synth_sound(ch % NCH)->engine);
+}
+
 /* a screen reader that has just started listening (or asks) hears the whole screen */
 static void speak(void)
 {
@@ -318,6 +381,10 @@ static void speak(void)
         o[1] = 0;
         text_cat(t, o);
         text_cat(t, ". ");
+        if (chan_given(set.channel)[0]) {
+            text_cat(t, chan_given(set.channel));
+            text_cat(t, ". ");
+        }
         text_cat(t, synth_engine_name(synth_sound(set.channel)->engine));
         text_cat(t, ". ");
         text_cat(t, synth_preset_name(set.channel));
@@ -390,6 +457,7 @@ static int32_t note_degree(int32_t base, int32_t note)   /* the nearest degree a
 
 /* an engine that maps the keys itself (DRUM: the lanes, SLICE: the slices): no scale, no transpose */
 static int maps_keys(uint32_t ch) { return synth_key_note(ch, 0) >= 0; }
+static void ch_chord(uint32_t ch, char *out);
 static int drum_lane_of(int32_t note)    /* DRUM: the lane a note plays, -1 none */
 {
     uint32_t i;
@@ -427,8 +495,11 @@ static uint32_t key_notes(uint32_t k, int8_t *out)
     }
     note = 53 + (int32_t)k + 12 * set.octave;
     if (song.keys == 2u) {               /* WHITE: the white keys walk the scale from the root */
-        if (w < 0)
-            return 0;
+        if (w < 0 && chord)
+            return 0;                    /* (a chord on: the black keys are CHORD+'s) */
+        if (w < 0)                       /* a black key: the note of the white key below it, as SNAP plays a key off the
+                                          * scale (always in key) */
+            w = white_index(k ? k - 1u : 0u);
         note = SCALE_MASK[song.scale & 15u] == 0xFFFu ? base + 12 + w - 4   /* (CHROM: semitones) */
              : degree_note(base + 12, w - 4);   /* (C4 plays ROOT, the white keys walk up and down from it) */
     } else if (song.keys == 1u) {        /* SNAP: a key off the scale plays the one below */
@@ -568,6 +639,49 @@ static int dr_ch(void)                   /* GLO DRUMS: the selected channel if i
     return -1;
 }
 
+/* NAME (SHIFT + SAVE): a channel's name, A-Z 0-9 space and a few signs, or one of the ready ones */
+static const char NAME_CS[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-./+#&!";
+static const char *const NAME_READY[] = {"DRUMS", "BASS", "KEYS", "LEAD", "PAD", "CHORD", "ARP", "FX", "VOX", "GTR"};
+#define NREADY (sizeof NAME_READY / sizeof NAME_READY[0])
+
+static void name_open(void)              /* the selected channel's name to edit */
+{
+    uint32_t i;
+    const char *n = chan_given(set.channel);
+    ui.name_ch = set.channel;
+    for (i = 0; i < SONG_NAME; i++)
+        ui.name[i] = ' ';
+    ui.name[SONG_NAME] = 0;
+    for (i = 0; n[i]; i++)
+        ui.name[i] = n[i];
+    ui.name_cur = 0;
+    ui.name_pre = 0;
+    ui.page = PG_NAME;
+    ui.group_btn = B_SAVE;
+    ui.layer = -1;
+    ui.layer_lock = 0;
+    app_say("NAME", n[0] ? n : "NONE");
+}
+static void name_close(int keep)         /* SAVE again: kept (all spaces: none); HOME: as it was */
+{
+    uint32_t i, ch = ui.name_ch % NCH;
+    char t[8];
+    if (keep) {
+        uint32_t n = 0;
+        for (i = 0; i < SONG_NAME; i++)
+            if (ui.name[i] != ' ')
+                n = i + 1u;
+        memset(song.name[ch], 0, SONG_NAME);
+        for (i = 0; i < n; i++)
+            song.name[ch][i] = ui.name[i];
+        dirty();
+    }
+    channel_text(ch, t);
+    ui.page = PG_HOME;
+    ui.group_btn = B_HOME;
+    app_say(t, keep ? chan_name(ch) : "NAME AS IT WAS");
+}
+
 static const char *kn_label(uint32_t id)
 {
     static const char *const L[] = {
@@ -593,12 +707,18 @@ static const char *kn_label(uint32_t id)
         [KN_FM_MODE] = "MODE", [KN_FM_DTUN] = "DTUN", [KN_FM_VEL] = "VEL", [KN_VMUTE] = "MUTE", [KN_PFADE] = "FADE",
         [KN_PRE_SOUND] = "SOUND", [KN_PRE_ENGINE] = "ENGINE", [KN_PRE_FAV] = "FAV", [KN_USLOT] = "SLOT",
         [KN_ULOAD] = "LOAD", [KN_UERASE] = "ERASE", [KN_USAVE] = "SAVE", [KN_CLRSQ] = "CLRSQ", [KN_INIT] = "INIT",
+        [KN_NMCUR] = "CURSOR", [KN_NMCHR] = "CHAR", [KN_NMPRE] = "NAME", [KN_NMCLR] = "CLEAR",
+        [KN_HOMEVIEW] = "HOME", [KN_AUTOLOOP] = "AUTOLP", [KN_FACTORY] = "RESET", [KN_BATT] = "BATTERY",
         [KN_LOWCUT] = "LOWCUT", [KN_USBA] = "USB", [KN_RESO] = "RESO", [KN_STEPADV] = "ADVANCE", [KN_NSEL] = "NOTE#", [KN_NPITCH] = "PITCH",
         [KN_NMOVE] = "MOVE", [KN_NLEN] = "LENGTH", [KN_DLANE] = "LANE", [KN_DSTEP] = "STEP", [KN_DHIT] = "HIT",
         [KN_DVEL] = "VEL",
         [KN_DRPREV] = "PREVIEW",
     };
     static char t[8];
+    if (ui.page == PG_PITCH && id == KN_SP + SP_PENV)
+        return "ENV";                    /* (PITCH: the envelope's and the LFO's pitch apart) */
+    if (ui.page == PG_PITCH && id == KN_SP + SP_LFO_PIT)
+        return "VIB";
     if (id >= KN_SP && id < KN_SP + SP_N)
         return synth_param_label(set.channel, id - KN_SP);
     if (id >= KN_EK && id < KN_EK + 4u)
@@ -792,6 +912,10 @@ static uint32_t kn_value(uint32_t id, char *out)
         case KN_BT: v = FM1B_BLE && !set.ble_off; copy_text(out, !FM1B_BLE ? "NONE" : v ? "ON" : "OFF", 8); break;
         case KN_ACCEL: v = prefs.knob_accel; on_off(v, out); break;
         case KN_GRAPHS: v = prefs.graphs; on_off(v, out); break;
+        case KN_HOMEVIEW: v = prefs.home_view; copy_text(out, v ? "LOOP" : "PLAY", 8); break;
+        case KN_AUTOLOOP: v = !prefs.loop_manual; on_off(v, out); break;
+        case KN_FACTORY: copy_text(out, ui.fr_arm ? "PLAY 3S" : "TURN", 8); return 0;
+        case KN_BATT: batt_text(out); return 0;
         case KN_LIGHTS: {
             static const char *const L3[3] = {"OFF", "LOW", "HIGH"};
             v = prefs.lights; hi = 2; copy_text(out, L3[v % 3], 8); break;
@@ -839,6 +963,24 @@ static uint32_t kn_value(uint32_t id, char *out)
             if (!user_used(ui.uslot)) text_cat(out, " -");
             break;
         case KN_ULOAD: case KN_UERASE: case KN_USAVE: case KN_CLRSQ: case KN_INIT: copy_text(out, "GO", 8); return 0;
+        case KN_NMCUR: v = ui.name_cur; hi = SONG_NAME - 1; int_text(v + 1, out); text_cat(out, "/8"); break;
+        case KN_NMCHR: {
+            char c = ui.name[ui.name_cur % SONG_NAME];
+            uint32_t i = 0;
+            while (NAME_CS[i] && NAME_CS[i] != c)
+                i++;
+            v = (int32_t)i; hi = (int32_t)sizeof NAME_CS - 2;
+            if (c == ' ')
+                copy_text(out, "SPACE", 8);
+            else {
+                out[0] = c;
+                out[1] = 0;
+            }
+            break;
+        }
+        case KN_NMPRE: v = ui.name_pre; hi = NREADY;
+            copy_text(out, v ? NAME_READY[v - 1] : "-", 8); break;
+        case KN_NMCLR: copy_text(out, "GO", 8); return 0;
         case KN_LOWCUT: v = prefs.lowcut; on_off(v, out); break;
         case KN_USBA: v = prefs.usb_full; copy_text(out, v ? "FULL" : "MASTER", 8); break;
         case KN_STEPADV: v = prefs.step_adv; on_off(v, out); break;
@@ -1244,7 +1386,35 @@ static void kn_turn(uint32_t id, int32_t e)
     }
     case KN_RSTART: seq_cfg.rec_start = s > 0 ? RS_COUNT : RS_NOTE; app_mark(); break;
     case KN_RQUANT: seq_cfg.rec_quant = s > 0; app_mark(); break;
-    case KN_RREPL: seq_cfg.rec_replace = s > 0; app_mark(); break;
+    case KN_RREPL: seq_cfg.rec_replace = s > 0; seq_replace_changed(); app_mark(); break;
+    case KN_NMCUR: ui.name_cur = (uint8_t)clamp(ui.name_cur + s, 0, SONG_NAME - 1); break;
+    case KN_NMCHR: {                     /* the character at the cursor, round the set */
+        uint32_t i = 0, n = sizeof NAME_CS - 1u;
+        while (NAME_CS[i] && NAME_CS[i] != ui.name[ui.name_cur % SONG_NAME])
+            i++;
+        ui.name[ui.name_cur % SONG_NAME] = NAME_CS[((int32_t)(i % n) + d % (int32_t)n + (int32_t)n) % (int32_t)n];
+        break;
+    }
+    case KN_NMPRE: {                     /* a ready name, the cursor after it */
+        uint32_t i;
+        const char *r;
+        ui.name_pre = (uint8_t)(((int32_t)ui.name_pre - 1 + s + (int32_t)NREADY) % (int32_t)NREADY + 1);
+        r = NAME_READY[ui.name_pre - 1u];
+        for (i = 0; i < SONG_NAME; i++)
+            ui.name[i] = ' ';
+        for (i = 0; r[i]; i++)
+            ui.name[i] = r[i];
+        ui.name_cur = (uint8_t)(i < SONG_NAME ? i : SONG_NAME - 1u);
+        break;
+    }
+    case KN_NMCLR: {
+        uint32_t i;
+        for (i = 0; i < SONG_NAME; i++)
+            ui.name[i] = ' ';
+        ui.name_cur = 0;
+        ui.name_pre = 0;
+        break;
+    }
     case KN_SNOTE:
         if (synth_is_kit(ch)) {          /* DRUM: the lanes in turn */
             int l = drum_lane_of(ui.entry[ch]);
@@ -1289,6 +1459,13 @@ static void kn_turn(uint32_t id, int32_t e)
     case KN_BT: ble_set(s < 0); break;
     case KN_ACCEL: prefs.knob_accel = s > 0; app_mark(); break;
     case KN_GRAPHS: prefs.graphs = s > 0; prefs.graph_set = 0; app_mark(); break;   /* (every page to the default) */
+    case KN_HOMEVIEW: prefs.home_view = s > 0; ui.loop = prefs.home_view; ui.loop_auto = 0; app_mark(); break;
+    case KN_AUTOLOOP: prefs.loop_manual = s < 0; app_mark(); break;
+    case KN_FACTORY:                     /* armed for 10 s: PLAY held 3 s erases everything nullwave keeps */
+        ui.fr_arm = plat_ms() | 1u;
+        app_say("ERASES ALL SONGS", "HOLD PLAY 3 S");
+        ui.msg_until = plat_ms() + 10000u;
+        break;
     case KN_LIGHTS: prefs.lights = (uint8_t)clamp(prefs.lights + s, 0, 2); app_mark(); break;
     case KN_SCALEKEYS: prefs.scale_keys = s > 0; app_mark(); break;
     case KN_AUTOSAVE: prefs.autosave = s > 0; app_mark(); break;
@@ -1318,7 +1495,17 @@ static void kn_turn(uint32_t id, int32_t e)
         dirty();
         break;
     case KN_PRE_FAV: ui_fav(ch, s > 0); break;
-    case KN_USLOT: ui.uslot = (uint8_t)clamp(ui.uslot + s, 0, 31); break;
+    case KN_USLOT: {                     /* (the slot's name said as it turns) */
+        char t[8] = "USER ";
+        uint32_t k = 5;
+        ui.uslot = (uint8_t)clamp(ui.uslot + s, 0, 31);
+        if (ui.uslot >= 9u)
+            t[k++] = (char)('0' + (ui.uslot + 1u) / 10u);
+        t[k++] = (char)('0' + (ui.uslot + 1u) % 10u);
+        t[k] = 0;
+        app_say(t, user_name(ui.uslot));
+        break;
+    }
     case KN_ULOAD:
         if (s > 0 && go(KN_ULOAD, "LOAD")) {
             if (user_load(ui.uslot, ch))
@@ -1467,6 +1654,8 @@ static const uint16_t *knobs_now(void)    /* the four knobs' jobs now */
     }
     if (seq_rec() == REC_ARMED && ui.page == PG_HOME)
         return PAGE_KN[PG_REC];
+    if (ui.page == PG_HOME && !ui.loop)  /* PLAY: the engine's EDIT 1, to play with */
+        return PAGE_KN[PG_EDIT1];
     return PAGE_KN[ui.page];
 }
 
@@ -1595,6 +1784,47 @@ static void release_key(uint32_t k)
     }
 }
 
+/* EDIT held, the black keys by the legends printed on the panel: OP1..OP6 (FM6: that operator's pages; held 0.5 s:
+ * the operator muted or back, as the stock firmware's long press), PIT the PITCH page, GLO the glide on or off, MONO,
+ * POLY the channel's voice mode. On other engines OP1 and OP2 open EDIT 1 and EDIT 2 */
+static void edit_legend(uint32_t b, int held)
+{
+    uint32_t ch = set.channel, fm6 = synth_sound(ch)->engine == 1u;
+    char t[8] = "OP ";
+    if (b < 6u) {
+        t[2] = (char)('1' + b);
+        t[3] = 0;
+        if (fm6 && held) {
+            app_say(t, synth_fm6_mute(ch, b) ? "MUTED" : "ON");
+            dirty();
+        } else if (fm6) {
+            ui.fm_op = (uint8_t)b;
+            ui.page = PG_FM_OP;
+            ui.group_btn = B_EDIT;
+            app_say(t, "EDIT");
+        } else if (b < 2u) {
+            ui.page = b ? PG_EDIT2 : PG_EDIT1;
+            ui.group_btn = B_EDIT;
+        } else {
+            app_say(t, "FM6 ONLY");
+        }
+    } else if (b == 6u) {                /* PIT */
+        ui.page = PG_PITCH;
+        ui.group_btn = B_EDIT;
+    } else if (b == 7u) {                /* GLO: the glide on (a medium time) or off; VOICE shows it */
+        int32_t g = synth_param(ch, SP_GLIDE);
+        synth_param_set(ch, SP_GLIDE, g ? 0 : 40);
+        dirty();
+        ui.page = PG_PITCH;
+        ui.group_btn = B_EDIT;
+        app_say("GLIDE", g ? "OFF" : "ON");
+    } else if (b == 8u || b == 9u) {     /* MONO, POLY */
+        synth_param_set(ch, SP_MONO, b == 8u ? 1 : 0);
+        dirty();
+        app_say("VOICE", b == 8u ? "MONO" : "POLY");
+    }
+}
+
 static void layer_key(uint32_t k, int down)
 {
     int w = white_index(k), b = black_index(k);
@@ -1641,10 +1871,18 @@ static void layer_key(uint32_t k, int down)
         uint32_t cnt;
         if (!down) {
             seq_erase_hold(ch, -1);
+            if (b >= 0 && ui.edit_key == (int8_t)b)
+                edit_legend((uint32_t)b, plat_ms() - ui.edit_t >= 500u);
+            ui.edit_key = -1;
             break;
         }
         if (b >= 0 && b < 8 && synth_sound(ch)->engine == 12u) {   /* DRUM: black keys 1-8 mute its lanes */
             app_say(synth_kit_sound((uint32_t)b), synth_lane_mute(ch, (uint32_t)b) ? "MUTED" : "ON");
+            break;
+        }
+        if (b >= 0) {                    /* the panel's legends: OP1-OP6, PIT, GLO, MONO, POLY (let go: edit_key) */
+            ui.edit_key = (int8_t)b;
+            ui.edit_t = plat_ms();
             break;
         }
         cnt = key_notes(k, n);
@@ -1849,6 +2087,10 @@ static uint16_t g_col;                   /* the channel's colour */
  * by how near their centres are to the line (as the graphs' curves are thin, near-vertical in places) */
 static void aa_line(float x0, float y0, float x1, float y1, float hw, uint16_t c)
 {
+#ifdef NW_HD
+    hd_line(x0, y0, x1, y1, hw, c);
+    hd_quiet++;
+#endif
     float dx = x1 - x0, dy = y1 - y0, adx = dx < 0 ? -dx : dx, ady = dy < 0 ? -dy : dy, g, w;
     int steep = ady > adx, i0, i1, i;
     if (steep) {
@@ -1880,6 +2122,9 @@ static void aa_line(float x0, float y0, float x1, float y1, float hw, uint16_t c
                 px_blend(i, j, c, (uint32_t)a);
         }
     }
+#ifdef NW_HD
+    hd_quiet--;
+#endif
 }
 static void g_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint16_t c)   /* a curve's segment, ~2 px */
 {
@@ -2134,8 +2379,12 @@ static void graph_afilter(uint32_t ch)   /* the engine's own filter (ANALOG): TY
 {
     static const uint8_t T[3] = {1, 3, 2};
     int32_t res = synth_param(ch, SP_E5);
+    int32_t cut = synth_param(ch, SP_E4), mod = synth_voices(ch) ? synth_cut_mod(ch) >> 8 : 0;
     graph_freq_grid();
-    graph_curve(T[clamp(synth_param(ch, SP_FTYPE), 0, 2)], synth_param(ch, SP_E4),
+    if (mod)                             /* moved by the modulation now (ENV, the LFO, the slots): where it is, live */
+        graph_curve(T[clamp(synth_param(ch, SP_FTYPE), 0, 2)], cut, (float)(8192 - res * 7600 / 127) / 4096.0f,
+                    TC(DIM), 0);
+    graph_curve(T[clamp(synth_param(ch, SP_FTYPE), 0, 2)], clamp(cut + mod, 0, 127),
                 (float)(8192 - res * 7600 / 127) / 4096.0f, g_col, 1);
 }
 
@@ -2358,6 +2607,7 @@ static uint32_t graph_sig(uint32_t kind, uint32_t now)   /* what the graph shows
     case GR_ENV: h = sig_add(h, (uint32_t)(synth_env_now(set.channel, &stage) >> 9) << 2 | stage); break;
     case GR_LFO: { float d; h = sig_add(h, (uint32_t)(synth_lfo_now(set.channel, &d) * 108.0f) << 4 | (uint32_t)(d * 15.0f)); break; }
     case GR_SCOPE: h = sig_add(h, now / 40u); break;   /* (25 a second) */
+    case GR_AFILTER: h = sig_add(h, (uint32_t)(synth_voices(set.channel) ? synth_cut_mod(set.channel) >> 8 : 0)); break;
     case GR_SLICER: { int32_t st; synth_slicer(set.channel, &st); h = sig_add(h, (uint32_t)(st + 1)); break; }
     case GR_ARP: { uint8_t n[16]; seq_arp_preview(set.channel, n, 16); for (i = 0; i < 16u; i++) h = sig_add(h, n[i]); break; }
     default: break;
@@ -2375,6 +2625,10 @@ static void button_down(uint32_t k, uint32_t now)
             ui.used[b] = 1;
     switch (k) {
     case B_PLAY:
+        if (ui.fr_arm && ui.page == PG_M_SYSTEM2 && now - ui.fr_arm < 10000u) {   /* FACTORY RESET armed: held 3 s */
+            ui.fr_hold = now | 1u;
+            return;
+        }
         if (seq_playing() && seq_rec() != REC_COUNT)
             seq_stop();
         else
@@ -2383,6 +2637,7 @@ static void button_down(uint32_t k, uint32_t now)
     case B_REC:
         if (shift_held()) {                  /* SHIFT + REC: OVERDUB <-> REPLACE, at once, recording or not */
             seq_cfg.rec_replace = (uint8_t)!seq_cfg.rec_replace;
+            seq_replace_changed();
             app_mark();
             app_say("REC", seq_cfg.rec_replace ? "REPLACE" : "OVERDUB");
             ui.oct_used = 1;
@@ -2440,7 +2695,29 @@ static void button_down(uint32_t k, uint32_t now)
         return;
     }
     case B_HOME:
+        if (shift_held()) {                  /* SHIFT + HOME: MAIN's channels as PLAY or as LOOP, and MAIN */
+            ui.oct_used = 1;
+            ui.used[k] = 1;
+            ui.loop = (uint8_t)!ui.loop;
+            ui.loop_auto = 0;
+            ui.loop_user = (uint8_t)(seq_playing() || seq_rec() != REC_OFF);   /* (kept so till it stops) */
+            go_home();
+            app_say("VIEW", ui.loop ? "LOOP" : "PLAY");
+            return;
+        }
         return;                              /* (on release: lock a layer held, or home; held: the menu) */
+    case B_SAVE:
+        if (shift_held() || ui.page == PG_NAME) {   /* SHIFT + SAVE: the channel's name; SAVE again: kept */
+            if (shift_held())
+                ui.oct_used = 1;
+            ui.used[k] = 1;
+            if (ui.page == PG_NAME)
+                name_close(1);
+            else
+                name_open();
+            return;
+        }
+        break;
     case B_GLO:
         if (shift_held()) {                  /* SHIFT + GLO: the SETTINGS screen (as HOME held) */
             ui.oct_used = 1;
@@ -2515,8 +2792,8 @@ static void button_up(uint32_t k, uint32_t now)
             octave_step(k == B_OCTDN ? -1 : 1);
         return;
     case B_HOME:
-        if (held >= HOME_HOLD_MS)
-            return;                          /* (the menu opened, or closed, while held) */
+        if (held >= HOME_HOLD_MS || ui.used[k])
+            return;                          /* (the menu opened, or closed, while held; SHIFT + HOME done) */
         for (b = 0; b < NB; b++)             /* a layer held: kept open */
             if (has_layer(b) && (ui.btn >> b & 1u) && ui.layer == (int8_t)b) {
                 ui.layer_lock = 1;
@@ -2524,6 +2801,10 @@ static void button_up(uint32_t k, uint32_t now)
                 app_say("LAYER", "KEPT");
                 return;
             }
+        if (ui.page == PG_NAME && !layer_on()) {   /* NAME: left as it was */
+            name_close(0);
+            return;
+        }
         if (ui.group_btn == G_MENU && !layer_on()) {   /* SETTINGS: the next group's first page, round */
             int8_t l[GMAX];
             int i, n = group_list(G_MENU, l), cur = page_index();
@@ -2535,12 +2816,6 @@ static void button_up(uint32_t k, uint32_t now)
                 }
             if (i == n)
                 ui.page = (uint8_t)l[0];
-            return;
-        }
-        if (ui.page == PG_HOME && ui.group_btn == B_HOME && !layer_on()) {   /* again on MAIN: the visualiser */
-            static const char *const VN[4] = {"OFF", "BARS", "RINGS", "SCOPE"};
-            ui.vis = (uint8_t)((ui.vis + 1u) % 4u);
-            app_say("VISUALISER", VN[ui.vis]);
             return;
         }
         go_home();
@@ -2673,12 +2948,16 @@ static void encoders_input(void)
             }
             continue;                        /* (ALGORITHM and PRESETS wait in a layer) */
         }
+        if (ui.page == PG_NAME && k < EN_K1)   /* NAME: the channel and its sound stay, SELECT waits */
+            continue;
         if (k == EN_SELECT) {
             if (ui.page != PG_HOME && group_pages() > 1)
                 page_turn(e);
             else
                 kn_turn(KN_BPM, e);
-        } else if (k == EN_ALGO) {           /* the channel */
+        } else if (k == EN_ALGO) {           /* the channel (a REPLACE pass stops: its channel keeps its last take) */
+            if (seq_rec() == REC_ON && seq_cfg.rec_replace)
+                seq_rec_off();
             set.channel = (uint8_t)(((int32_t)set.channel + e % NCH + NCH) % NCH);
             app_mark();
             say_sound();
@@ -2705,7 +2984,9 @@ static void encoders_input(void)
 
 static void input(void)
 {
-    uint32_t keys, btn = debounce(plat_buttons() | remote_btn);   /* (REMOTE: the buttons held over MIDI) */
+    uint32_t keys, raw = plat_buttons() | remote_btn, btn;   /* (REMOTE: the buttons held over MIDI) */
+    boot_ignore &= raw;                  /* (a button held at power-on: nothing till it is let go) */
+    btn = debounce(raw & ~boot_ignore);
     touch_poll();                            /* the sensed keys' presses, velocities and pressure */
     keys = touch_keys();
     if (keys != ui.keys || btn != ui.btn)
@@ -2737,7 +3018,18 @@ static void lights(uint32_t now)
         mid |= 1u << B_SAVE;
     if (set.octave)
         mid |= 1u << (set.octave < 0 ? B_OCTDN : B_OCTUP);
+    kdim = (1u << NKEYS) - 1u;               /* every key glows (BUTTON LIGHTS), whatever is on: to play in the dark */
     if (layer_shown()) {                     /* the layer's keys */
+        if (ui.layer == B_EDIT) {            /* (the black keys' legends: OP1..OP6, PIT, GLO, MONO, POLY; a drum
+                                              * kit's lanes; lit: a muted lane or operator, the voice mode) */
+            uint32_t e = synth_sound(set.channel)->engine, m = e == 12u ? synth_lane_mutes(set.channel)
+                       : e == 1u ? synth_fm6_mutes(set.channel) : 0u, vm = (uint32_t)synth_param(set.channel, SP_MONO);
+            for (i = 0; i < (e == 12u ? 8u : 10u); i++)
+                if ((m >> i & 1u) || (i == 8u && vm == 1u) || (i == 9u && vm == 0u) || (i == 7u && synth_param(set.channel, SP_GLIDE)))
+                    klit |= 1u << BLACK_KEYS[i];
+                else
+                    kmid |= 1u << BLACK_KEYS[i];
+        }
         if (ui.layer == B_GLO) {             /* (the solos: the black keys F#4..F#5) */
             for (i = 5; i < 11u; i++) {
                 if (seq_solo() >> (i - 5u) & 1u)
@@ -2828,7 +3120,8 @@ static void draw_top(int bat, uint32_t now)
     cv_text(4 + (25 - text_w(t[2] ? &FONT_XS : &FONT_B, t)) / 2, at_mid(t[2] ? &FONT_XS : &FONT_B, 12),
             t[2] ? &FONT_XS : &FONT_B, t, TC(BG));
     nb = p->bars;
-    for (i = 0; i < nb; i++) {               /* the pattern's bars: the one shown lit */
+    for (i = 0; i < nb && seq_queued() < 0; i++) {   /* the pattern's bars: the one shown lit (a scene queued:
+                                                  * its name there instead) */
         if (nb <= 4)
             cv_rect(34 + 9 * i, 9, 7, 6, (uint32_t)i == bar ? TC(FG) : TC(DIM));
         else
@@ -2839,7 +3132,7 @@ static void draw_top(int bat, uint32_t now)
         t[1] = (char)('A' + seq_slot());
         int_text(seq_queued() + 1, t + 2);
         if (blink)
-            cv_text(72, at_mid(&FONT_XS, 12), &FONT_XS, t, TC(REC));
+            cv_text(34, at_mid(&FONT_XS, 12), &FONT_XS, t, TC(REC));   /* (where the bars were: clear of the tempo) */
     } else if (seq_count()) {
         int_text(seq_count(), t);
         cv_text(72, at_mid(&FONT_XS, 12), &FONT_XS, t, TC(REC));
@@ -2863,10 +3156,17 @@ static void draw_top(int bat, uint32_t now)
     y = at_base(&FONT_B, 12 + 6);
     cv_text(128 - text_w(&FONT_B, t), y, &FONT_B, t, TC(FG));
     cv_text(131, at_base(&FONT_T, 18), &FONT_T, song.mode ? "SNG" : "BPM", TC(SUB));
+#ifdef NW_HD
+    hd_tri(160.0f, 5.0f, 173.0f, 12.5f, 160.0f, 20.0f, seq_playing() ? TC(FG) : TC(DIM));
+    hd_quiet++;
+#endif
     for (i = 0; i < 15; i++) {               /* play: a triangle 13 x 15, lit while playing */
         int32_t w = (13 * (15 - 2 * (i < 7 ? 7 - i : i - 7)) + 7) / 15;
         cv_rect(160, 5 + i, w, 1, seq_playing() ? TC(FG) : TC(DIM));
     }
+#ifdef NW_HD
+    hd_quiet--;
+#endif
     if (r == REC_ON || ((r == REC_COUNT || r == REC_TAKE) && blink))
         circle(2 * 184 + 1, 2 * 12 + 1, 5.5f, 0, TC(REC));
     else
@@ -2881,36 +3181,288 @@ static void draw_top(int bat, uint32_t now)
     cv_blit(0, 0);
 }
 
-/* a channel's row, 28 px at y 26 + 28 i */
-static void draw_row(uint32_t i)
+/* MAIN's channels, four at a time (the selected one among them, the list sliding to it): PLAY, a row of 36 px each
+ * (the name big, the sound, a dot that flashes as it strikes, the level) over a scope of the selected channel; LOOP,
+ * a row of 42 px each (the steps of the bar playing, the level, M and S). Both show the same four. */
+#define PLAY_RH 36
+#define LOOP_RH 42
+static int32_t chans_off(int32_t rh) { return (int32_t)ui.pv_y * rh / (8 * LOOP_RH); }
+
+static void loop_row(uint32_t i, int32_t y)
 {
-    const sound_t *s = synth_sound(i);
     int muted = !synth_audible(i), sel = i == set.channel, rec = seq_rec() != REC_OFF && seq_rec_ch() == i;
     uint16_t c = muted ? th.ch_mute[i] : th.ch[i];
     char n[2] = {(char)('1' + i), 0};
     uint32_t k, m = seq_mute() >> i & 1u, so = seq_solo() >> i & 1u, bar = sel_bar(i), cells = seq_cells(i, bar);
     int32_t pos = seq_pos(i), ph = pos >= 0 && (uint32_t)pos / TBAR == bar ? (int32_t)((uint32_t)pos % TBAR / TPS) : -1;
-    cv_begin(240, 28, TC(BG));
     if (sel)
-        rrect_line(2, 1, 237, 26, 4, rec ? TC(REC) : th.ch_line[i], th.ch_fill[i]);
+        rrect_line(2, y + 2, 230, 38, 4, rec ? TC(REC) : th.ch_line[i], th.ch_fill[i]);
     else if (rec)
-        rrect_line(2, 1, 237, 26, 4, TC(REC), TC(BG));
-    rrect(4, 4, 5, 20, 2, c);
-    cv_text(17 - text_w(&FONT_B, n) / 2, at_mid(&FONT_B, 14), &FONT_B, n, c);
-    text_fit(26, 1, &FONT_B, synth_engine_name(s->engine), muted ? TC(SUB) : TC(FG), 64);
-    text_fit(26, 15, &FONT_T, synth_preset_name(i), muted ? TC(DIM) : TC(SUB), 64);
+        rrect_line(2, y + 2, 230, 38, 4, TC(REC), TC(BG));
+    rrect(5, y + 7, 5, 28, 2, c);
+    cv_text(19 - text_w(&FONT_B, n) / 2, at_mid(&FONT_B, y + 21), &FONT_B, n, c);
+    text_fit(28, y + 6, &FONT_B, chan_name(i), muted ? TC(SUB) : TC(FG), 62);   /* (its name, else its engine) */
+    {                                    /* (a chord playing: its name in place of the sound's) */
+        char cn[16];
+        ch_chord(i, cn);
+        text_fit(28, y + 22, &FONT_T, cn[0] ? cn : synth_preset_name(i), muted ? TC(DIM) : cn[0] ? TC(FG) : TC(SUB), 62);
+    }
     for (k = 0; k < 16u; k++) {
         uint16_t cc = (int32_t)k == ph ? TC(FG) : cells >> k & 1u ? c : TC(PANEL);
-        rrect(92 + 6 * (int32_t)k + 2 * (int32_t)(k / 4u), 7, 5, 8, 1, cc);
+        rrect(92 + 6 * (int32_t)k + 2 * (int32_t)(k / 4u), y + 9, 5, 13, 1, cc);
     }
-    cv_rect(92, 19, 101, 4, TC(PANEL));
-    cv_rect(92, 19, ui.lvl[i], 4, c);
-    rrect(199, 6, 17, 17, 3, m ? TC(MUTE) : TC(PANEL));
-    cv_text(199 + (17 - text_w(&FONT_XS, "M") + 1) / 2, at_mid(&FONT_XS, 14), &FONT_XS, "M", m ? TC(BG) : TC(SUB));
-    rrect(218, 6, 17, 17, 3, so ? TC(FG) : TC(PANEL));
-    cv_text(218 + (17 - text_w(&FONT_XS, "S") + 1) / 2, at_mid(&FONT_XS, 14), &FONT_XS, "S", so ? TC(BG) : TC(SUB));
-    cv_blit(0, 26 + 28 * i);
+    cv_rect(92, y + 27, 101, 5, TC(PANEL));
+    cv_rect(92, y + 27, ui.lvl[i], 5, c);
+    rrect(196, y + 12, 17, 17, 3, m ? TC(MUTE) : TC(PANEL));
+    cv_text(196 + (17 - text_w(&FONT_XS, "M") + 1) / 2, at_mid(&FONT_XS, y + 20), &FONT_XS, "M", m ? TC(BG) : TC(SUB));
+    rrect(214, y + 12, 17, 17, 3, so ? TC(FG) : TC(PANEL));
+    cv_text(214 + (17 - text_w(&FONT_XS, "S") + 1) / 2, at_mid(&FONT_XS, y + 20), &FONT_XS, "S", so ? TC(BG) : TC(SUB));
 }
+
+#include "chords.c"                       /* chord_spell: the notes held named as a chord, in the song's key */
+static void ch_chord(uint32_t ch, char *out)   /* LOOP: the chord a channel plays (three notes or more), else "" */
+{
+    synth_vview_t vv[SYN_VMAX];
+    uint32_t n = synth_voice_view(ch, vv), i, nn = 0, pcs = 0, c = 0;
+    int32_t held[SYN_VMAX];
+    char det[8];
+    out[0] = 0;
+    if (maps_keys(ch))
+        return;
+    for (i = 0; i < n; i++)
+        if (vv[i].gate) {
+            held[nn++] = vv[i].note;
+            pcs |= 1u << (vv[i].note % 12u);
+        }
+    for (i = 0; i < 12u; i++)
+        c += pcs >> i & 1u;
+    if (c >= 3u)
+        chord_spell(held, nn, song.root % 12u, song.scale, out, det, 16);
+}
+
+static uint32_t chans_sig(uint32_t band)   /* what a band of LOOP's four channels shows */
+{
+    int32_t rh = LOOP_RH, bh = 2 * rh, off = chans_off(rh);
+    uint32_t i, h = sig_add(2166136261u, set.channel << 16 | (uint16_t)ui.pv_y);
+    h = sig_add(h, (uint32_t)(seq_rec() != REC_OFF) << 8 | seq_rec_ch());
+    for (i = 0; i < NCH; i++) {
+        int32_t y = rh * (int32_t)i - off, pos = seq_pos(i);
+        const sound_t *s = synth_sound(i);
+        if (y + rh <= bh * (int32_t)band || y >= bh * (int32_t)(band + 1u))
+            continue;
+        h = sig_add(h, i << 24 | (uint32_t)synth_audible(i) << 2 | (seq_mute() >> i & 1u) << 1 | (seq_solo() >> i & 1u));
+        h = sig_str(sig_add(h, (uint32_t)s->engine << 8 | s->preset), chan_given(i));
+        h = sig_add(h, ui.lvl[i]);
+        h = sig_add(h, seq_cells(i, sel_bar(i)));
+        h = sig_add(h, pos >= 0 ? (uint32_t)pos / TPS : 0xFFFFu);
+        {
+            char cn[16];
+            ch_chord(i, cn);
+            h = sig_str(h, cn);
+        }
+    }
+    return h;
+}
+
+static void draw_chans(uint32_t band)    /* LOOP, band 0..1: two rows each */
+{
+    int32_t rh = LOOP_RH, bh = 2 * rh, off = chans_off(rh);
+    uint32_t i;
+    cv_begin(240, (uint32_t)bh, TC(BG));
+    cv_oy = -bh * (int32_t)band;
+    cv_y0 = 0;
+    cv_y1 = bh;
+    for (i = 0; i < NCH; i++) {
+        int32_t y = rh * (int32_t)i - off;
+        if (y + rh > bh * (int32_t)band && y < bh * (int32_t)(band + 1u))
+            loop_row(i, y);
+    }
+    for (i = 0; i < NCH; i++) {          /* where the four are among the six: a dot each, the selected in its colour */
+        int32_t y = bh - 3 * 9 + 9 * (int32_t)i + 2;
+        uint16_t c = i == set.channel ? th.ch[i] : i >= ui.pv_top && i < ui.pv_top + 4u ? TC(SUB) : TC(PANEL);
+        rrect(235, y, 4, 5, 1, c);
+    }
+    cv_oy = 0;
+    cv_blit(0, 26 + (uint32_t)bh * band);
+}
+
+/* PLAY: a line naming the selected channel (and six dots, the channels, each flashing as it plays), then the channel
+ * drawn alive (anim.c) with the notes it plays named under it, the chord, the key (or on a kit, the drums) */
+#define PLAY_HEAD 24
+#define PLAY_ANIM 144                    /* (two bands of 72) */
+#define PULSE_MS 360u
+#include "anim.c"
+
+static void draw_play_head(uint32_t now)
+{
+    uint32_t ch = set.channel, i;
+    uint16_t c = th.ch[ch];
+    char n[2] = {(char)('1' + ch), 0};
+    int32_t x;
+    cv_begin(240, PLAY_HEAD, TC(BG));
+    rrect(4, 4, 5, 16, 2, c);
+    cv_text(14, at_mid(&FONT_B, 12), &FONT_B, n, c);
+    x = text_fit(28, at_mid(&FONT_B, 12), &FONT_B, chan_name(ch), TC(FG), 80);
+    text_fit(x + 8, at_mid(&FONT_T, 12), &FONT_T, synth_preset_name(ch), TC(SUB), 168 - x);
+    for (i = 0; i < NCH; i++) {          /* the six: the selected ringed, each swelling as it strikes */
+        uint32_t age = ui.pulse_t[i] ? now - ui.pulse_t[i] : PULSE_MS;
+        float r = synth_audible(i) && age < PULSE_MS ? 2.5f + 2.0f * (float)(PULSE_MS - age) / (float)PULSE_MS : 2.5f;
+        int32_t cx = 184 + 9 * (int32_t)i;
+        circle(2 * cx, 2 * 12, r, 0.0f, synth_audible(i) ? th.ch[i] : th.ch_mute[i]);
+        if (i == ch)
+            circle(2 * cx, 2 * 12, 4.5f, 1.0f, TC(FG));
+    }
+    cv_rect(0, PLAY_HEAD - 1, 240, 1, TC(LINE));
+    cv_blit(0, 26);
+}
+
+static uint32_t play_keys_state(uint32_t *lit, char *t1, char *t2);
+static void play_notes(char *out);
+static char play_det[8];                 /* the interval of two notes (chord_spell's detail), shown beside the name */
+/* why the channel makes no sound, where nothing else on PLAY shows it: muted, another channel soloed, its level at 0,
+ * the master filter closed, FM6's operators all muted; 0 none */
+static const char *silent_why(uint32_t ch)
+{
+    int32_t f = synth_master(MST_FILT);
+    if (seq_mute() >> ch & 1u)
+        return "MUTED";
+    if (seq_solo() && !(seq_solo() >> ch & 1u))
+        return "SOLO ELSEWHERE";
+    if (lvl_q(ch) == 0)
+        return "LEVEL 0";
+    if (f <= -56 || f >= 56)
+        return "MASTER FILTER";
+    if (synth_sound(ch)->engine == 1u && (synth_fm6_mutes(ch) & 0x3Fu) == 0x3Fu)
+        return "OPS MUTED";
+    if (!maps_keys(ch)) {                /* (C4 with the octave and TRANS: out of the speaker's reach) */
+        int32_t c4 = 60 + 12 * set.octave + song.transpose;
+        if (c4 < 30)
+            return "TOO LOW: OCT, TRANS";
+        if (c4 > 100)
+            return "TOO HIGH: OCT, TRANS";
+    }
+    return 0;
+}
+static void draw_play_anim(uint32_t band, uint32_t now)
+{
+    cv_begin(240, PLAY_ANIM / 2, TC(BG));
+    cv_oy = -(PLAY_ANIM / 2) * (int32_t)band;
+    cv_y0 = 0;
+    cv_y1 = PLAY_ANIM / 2;
+    anim_draw(set.channel, now);
+    {                                    /* under it: the notes sounding, and the chord and the key (a kit: its drums) */
+        uint32_t lit;
+        char t1[24], t2[24], nt[24];
+        play_keys_state(&lit, t1, t2);
+        play_notes(nt);
+        {                                /* (one note: the chord's place names it already) */
+            uint32_t q = 0, sp = 0;
+            while (nt[q])
+                sp |= nt[q++] == ' ';
+            if (!sp)
+                nt[0] = 0;
+        }
+        cv_rect(0, PLAY_ANIM - 32, 240, 1, TC(LINE));
+        {                                /* the chord, large (two notes: their interval beside it, after a dot) */
+            int32_t x = text_fit(8, PLAY_ANIM - 28, &FONT_M, t1[0] ? t1 : "-", t1[0] ? TC(FG) : TC(DIM), 140);
+            if (play_det[0] && t1[0]) {
+                cv_rect(x + 5, PLAY_ANIM - 15, 2, 2, TC(SUB));
+                text_fit(x + 11, PLAY_ANIM - 20, &FONT_B, play_det, TC(SUB), 40);
+            }
+        }
+        {                                /* the right: the key (silent: why, in red, instead), the notes under it */
+            const char *why = silent_why(set.channel), *k = why ? why : t2;
+            int32_t w = text_w(&FONT_T, k);
+            cv_text(232 - (w < 150 ? w : 150), PLAY_ANIM - 28, &FONT_T, k, why ? TC(REC) : TC(SUB));
+            w = text_w(&FONT_T, nt);
+            cv_text(232 - (w < 90 ? w : 90), PLAY_ANIM - 15, &FONT_T, nt, TC(DIM));
+        }
+    }
+    cv_oy = 0;
+    cv_blit(0, 26 + PLAY_HEAD + (PLAY_ANIM / 2) * band);
+}
+
+static const char *const NOTE_NM[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+
+static uint32_t play_keys_state(uint32_t *lit, char *t1, char *t2)   /* the keys sounding, the two texts */
+{
+    synth_vview_t vv[SYN_VMAX];
+    uint32_t ch = set.channel, n = synth_voice_view(ch, vv), i, pcs = 0, k, drums = 0, nn = 0;
+    int32_t base = 53 + 12 * set.octave, low = -1, held[SYN_VMAX];
+    *lit = 0;
+    for (i = 0; i < n; i++) {
+        int32_t note = vv[i].note;
+        if (!vv[i].amp && !vv[i].gate)
+            continue;
+        if (maps_keys(ch)) {             /* a kit: the keys by its own map, the drums named */
+            for (k = 0; k < NKEYS; k++)
+                if (synth_key_note(ch, k) == note)
+                    *lit |= 1u << k;
+            if (synth_is_kit(ch) && synth_drum_lane((uint32_t)note) >= 0)
+                drums |= 1u << synth_drum_lane((uint32_t)note);
+            continue;
+        }
+        if (note - base >= 0 && note - base < (int32_t)NKEYS)
+            *lit |= 1u << (note - base);
+        if (vv[i].gate) {
+            pcs |= 1u << (note % 12);
+            low = low < 0 || note < low ? note : low;
+            if (nn < SYN_VMAX)
+                held[nn++] = note;
+        }
+    }
+    t1[0] = t2[0] = 0;
+    play_det[0] = 0;
+    if (synth_is_kit(ch)) {
+        for (i = 0, k = 0; i < 8u; i++)   /* (the first drum hit on the first line, the next ones under it) */
+            if (drums >> i & 1u) {
+                char *t = k++ ? t2 : t1;
+                if (t[0])
+                    text_cat(t, " ");
+                text_cat(t, synth_param_label(ch, SP_X0 + i));
+            }
+        return drums;
+    }
+    chord_spell(held, nn, song.root % 12u, song.scale, t1, play_det, 24);
+    if (song.scale || song.keys) {
+        char sc[12];
+        copy_text(t2, chord_pc((int32_t)song.root, chord_key_spell((int32_t)song.root, song.scale)), 8);
+        text_cat(t2, " ");
+        kn_value(KN_SCALE, sc);
+        text_cat(t2, sc);
+    }
+    return pcs;
+}
+
+static void play_notes(char *out)      /* the notes sounding, by name, lowest first (a kit: none, its drums say it) */
+{
+    synth_vview_t vv[SYN_VMAX];
+    uint32_t n = synth_voice_view(set.channel, vv), i, j, c = 0;
+    int32_t got[SYN_VMAX];
+    out[0] = 0;
+    if (maps_keys(set.channel))
+        return;
+    for (i = 0; i < n; i++)
+        if (vv[i].gate)
+            got[c++] = vv[i].note;
+    for (i = 0; i < c; i++)              /* (lowest first) */
+        for (j = i + 1; j < c; j++)
+            if (got[j] < got[i]) {
+                int32_t x = got[i];
+                got[i] = got[j];
+                got[j] = x;
+            }
+    for (i = 0; i < c && i < 4u; i++) {
+        char b[6];
+        const char *nm = chord_pc(got[i], chord_key_spell((int32_t)song.root, song.scale));   /* (in the key's names) */
+        copy_text(b, nm, 4);
+        int_text(got[i] / 12 - 1, b + (nm[1] ? 2 : 1));
+        if (i)
+            text_cat(out, " ");
+        text_cat(out, b);
+    }
+}
+
 
 /* a layer's 16 tiles, four rows of four over the rows' band (two rows of tiles a band) */
 static void tile_info(uint32_t w, char *label, int *state)   /* state: 0 off, 1 on, 2 lit, 3 dim, 4 queued */
@@ -2921,10 +3473,12 @@ static void tile_info(uint32_t w, char *label, int *state)   /* state: 0 off, 1 
     switch (ui.layer) {
     case B_GLO:
         if (w >= 7u && w <= 12u) {       /* a channel: lit, off when muted, white when soloed (its black key) */
-            label[0] = 'C';
+            label[0] = 'C';              /* (its name if it has one) */
             label[1] = 'H';
             label[2] = (char)('1' + w - 7u);
             label[3] = 0;
+            if (chan_given(w - 7u)[0])
+                copy_text(label, chan_given(w - 7u), 9);
             *state = seq_solo() >> (w - 7u) & 1u ? 1 : seq_mute() >> (w - 7u) & 1u ? 0 : 2;
         } else if (w == 5u) {
             copy_text(label, "LEARN", 8);
@@ -3041,6 +3595,10 @@ static const char *set_label(uint32_t id)   /* a setting's name in full, as the 
     case KN_DRPREV: return "DRUM PREVIEW";
     case KN_LAUNCH: return "SCENE LAUNCH";
     case KN_RREPL: return "REC MODE";
+    case KN_HOMEVIEW: return "HOME VIEW";
+    case KN_AUTOLOOP: return "AUTO LOOP";
+    case KN_FACTORY: return "FACTORY RESET";
+    case KN_BATT: return "BATTERY";
     case KN_AUTOSAVE: return "AUTOSAVE";
     case KN_ABOUT: return "VERSION";
     default:
@@ -3133,13 +3691,17 @@ static void draw_foot(uint32_t now)
     cv_begin(240, 46, TC(BG));
     cv_rect(0, 1, 240, 1, TC(LINE));
     if (layer_shown())
-        title = ui.layer == B_GLO ? "MIX" : ui.layer == B_SEL ? "KEY" : ui.layer == B_EDIT ? "ERASE"
+        title = ui.layer_lock && ui.layer == B_SEL ? "KEY KEPT  TAP SEL TO PLAY"
+              : ui.layer_lock && ui.layer == B_GLO ? "MIX KEPT  TAP GLO TO PLAY"
+              : ui.layer == B_GLO ? "MIX" : ui.layer == B_SEL ? "KEY" : ui.layer == B_EDIT ? (synth_sound(ch)->engine == 12u ? "ERASE  LANE MUTES" : "ERASE  OP PIT GLO MONO POLY")
               : ui.layer == B_SEQ ? (ui.held_step >= 0 ? "STEP" : bar_title()) : ui.layer == B_FX ? "PUNCH"
               : ui.layer == B_ARP ? "ROLL" : "SCENES";
     else if (seq_rec() == REC_ARMED && ui.page == PG_HOME)
         title = seq_cfg.rec_replace ? "REC REPLACE" : "REC OVERDUB";
-    else if (ui.page == PG_EDIT1 || ui.page == PG_EDIT2)
+    else if (ui.page == PG_EDIT1 || ui.page == PG_EDIT2 || (ui.page == PG_HOME && !ui.loop))
         title = synth_page_title(ch, ui.page == PG_EDIT2);
+    else if (ui.page == PG_HOME && silent_why(ch))   /* LOOP: why the channel is silent, where the title is */
+        title = silent_why(ch);
     else
         title = PAGE_TITLE[ui.page];
     if (now < ui.msg_until) {
@@ -3150,12 +3712,12 @@ static void draw_foot(uint32_t now)
         t[0] = (char)('1' + ch);
         t[1] = ' ';
         t[2] = 0;
-        text_cat(t, synth_engine_name(synth_sound(ch)->engine));
+        text_cat(t, chan_name(ch));
         x = cv_text(4, ty, &FONT_T, setp ? (ui.group_btn == G_MENU ? "MENU" : "SETTINGS") : t, c);
         font_caps(&FONT_T, &ct, &cb);
         cv_rect(x + 3, ty + (ct + cb) / 2 - 1, 2, 2, c);
         x = cv_text(x + 9, ty, &FONT_T, title, c);
-        np = layer_shown() || ui.page == PG_HOME ? 0u : (uint32_t)group_pages();
+        np = layer_shown() || ui.page == PG_HOME || ui.page == PG_NAME ? 0u : (uint32_t)group_pages();
         pi = (uint32_t)page_index();
         if (np > 1u) {                       /* the page's number: "GLOBAL 1/8" */
             int_text((int32_t)pi + 1, t);
@@ -3164,7 +3726,7 @@ static void draw_foot(uint32_t now)
             cv_text(x + 5, ty, &FONT_T, t, TC(SUB));
         }
     }
-    np = layer_shown() || ui.page == PG_HOME ? 0u : (uint32_t)group_pages();
+    np = layer_shown() || ui.page == PG_HOME || ui.page == PG_NAME ? 0u : (uint32_t)group_pages();
     pi = (uint32_t)page_index();
     for (q = 0; q < np && np > 1u; q++)
         cv_rect(234 - 6 * ((int32_t)np - 1) + 6 * (int32_t)q, 7, 4, 4, q == pi ? c : TC(DIM));
@@ -3304,37 +3866,40 @@ static uint32_t seqview_sig(void)
     return h;
 }
 
-/* the visualiser (HOME tapped on MAIN): the channels' levels as bars or rings, or the selected channel's scope */
-static void draw_vis(uint32_t band)
+/* NAME: the channel, its eight places (the cursor's in its colour, blinking), what the buttons do */
+static void draw_name(uint32_t band, uint32_t blink)
 {
-    uint32_t i;
-    g_col = th.ch[set.channel];
+    uint32_t i, ch = ui.name_ch % NCH;
+    uint16_t c = th.ch[ch];
+    char t[24];
     cv_begin(240, 84, TC(BG));
     cv_oy = -84 * (int32_t)band;
     cv_y0 = 0;
     cv_y1 = 84;
-    if (ui.vis == 1u) {
-        for (i = 0; i < NCH; i++) {      /* a bar each, its level up from the floor */
-            int32_t x = 14 + 37 * (int32_t)i, h = ui.lvl[i] * 150 / 101;
-            rrect(x, 10, 28, 150, 3, TC(PANEL));
-            if (h > 0)
-                rrect(x, 160 - h, 28, h, 3, synth_audible(i) ? th.ch[i] : th.ch_mute[i]);
-        }
-    } else if (ui.vis == 2u) {
-        for (i = 0; i < NCH; i++) {      /* a ring each, wider as it sounds */
-            int32_t cx = 40 + 80 * (int32_t)(i % 3u), cy = 44 + 80 * (int32_t)(i / 3u);
-            float r = 6.0f + (float)ui.lvl[i] * 30.0f / 101.0f;
-            circle(2 * cx, 2 * cy, 36.0f, 1.0f, TC(LINE));
-            circle(2 * cx, 2 * cy, r, ui.lvl[i] > 4u ? 3.0f : 1.5f, synth_audible(i) ? th.ch[i] : th.ch_mute[i]);
-        }
-    } else
-        graph_scope();
+    channel_text(ch, t);
+    text_cat(t, "  ");
+    text_cat(t, synth_engine_name(synth_sound(ch)->engine));
+    cv_text(12, 18, &FONT_T, t, TC(SUB));
+    for (i = 0; i < SONG_NAME; i++) {
+        int32_t x = 12 + 27 * (int32_t)i, cur = i == ui.name_cur;
+        char g[2] = {ui.name[i], 0};
+        rrect(x, 48, 24, 40, 4, cur ? (blink ? c : th.ch_fill[ch]) : TC(PANEL));
+        if (g[0] != ' ')
+            cv_text(x + (24 - text_w(&FONT_B, g)) / 2, at_mid(&FONT_B, 68), &FONT_B, g,
+                    cur && blink ? TC(BG) : TC(FG));
+    }
+    cv_text(12, 112, &FONT_T, "SAVE  KEEP IT", TC(SUB));
+    cv_text(12, 134, &FONT_T, "HOME  AS IT WAS", TC(SUB));
     cv_oy = 0;
     cv_blit(0, 26 + 84 * band);
 }
 
+#ifdef PLAT_HOST                         /* (the host: what drawing costs, for the tests: expect draw_us, draw_px) */
+#include <time.h>
+static uint64_t draw_ns, draw_n, draw_px0;
+#endif
 /* each part redrawn only when what it shows has changed */
-static void draw(uint32_t now)
+static void draw_(uint32_t now)
 {
     uint32_t i, h, gk = graph_now(), mode = layer_shown() ? 1u : ui.group_btn == G_MENU ? 2u : gk ? 3u : 0u, blink = now / 250u & 1u;
     int bat = battery_state();
@@ -3344,8 +3909,10 @@ static void draw(uint32_t now)
         mode = 3u + gk;                  /* (another graph: the band again) */
     else if (mode == 0u && (ui.page == PG_NOTES || ui.page == PG_DGRID))
         mode = 3u + GR_N + (ui.page == PG_DGRID);   /* NOTES, DRUMS: their views */
-    else if (mode == 0u && ui.page == PG_HOME && ui.vis)
-        mode = 5u + GR_N + ui.vis;       /* the visualiser */
+    else if (mode == 0u && ui.page == PG_NAME)
+        mode = 9u + GR_N;                /* NAME: the name being edited */
+    else if (mode == 0u && !ui.loop)
+        mode = 10u + GR_N;               /* the channels as PLAY (0: as LOOP) */
     if (ui.theme_drawn != prefs.display || mode != ui.mode_drawn) {   /* another theme or view: everything again */
         if (ui.theme_drawn != prefs.display) {
             theme_set(prefs.display);
@@ -3366,14 +3933,47 @@ static void draw(uint32_t now)
         ui.sig_top = h;
         draw_top(bat, now);
     }
-    synth_scope_ch(gk == GR_SCOPE || mode == 8u + GR_N ? set.channel : NCH);
-    if (mode >= 6u + GR_N) {
-        h = sig_add(2166136261u, mode);
-        h = sig_add(h, now / 40u);
+    synth_scope_ch(gk == GR_SCOPE || mode == 10u + GR_N ? set.channel : NCH);
+    if (mode == 0u) {                    /* LOOP: four channels with their steps */
+        for (i = 0; i < 2u; i++) {
+            h = chans_sig(i);
+            if (h != ui.sig_row[i]) {
+                ui.sig_row[i] = h;
+                draw_chans(i);
+            }
+        }
+    } else if (mode == 10u + GR_N) {     /* PLAY: the selected channel, alive */
+        uint32_t ch = set.channel, k, lit;
+        const sound_t *s = synth_sound(ch);
+        char t1[24], t2[24];
+        h = sig_str(sig_add(2166136261u, ch << 16 | (uint32_t)s->engine << 8 | s->preset), chan_given(ch));
+        for (k = 0; k < NCH; k++) {
+            uint32_t age = ui.pulse_t[k] ? now - ui.pulse_t[k] : PULSE_MS;
+            h = sig_add(h, k << 16 | (uint32_t)synth_audible(k) << 8 | (age < PULSE_MS ? age / 30u : 99u));
+        }
         if (h != ui.sig_row[0]) {
             ui.sig_row[0] = h;
-            for (i = 0; i < 2u; i++)       /* (two bands of 84 rows: one seam, not two) */
-                draw_vis(i);
+            draw_play_head(now);
+        }
+        h = sig_add(2166136261u, ch << 24 | (uint32_t)s->engine << 16 | (anim_busy(ch) ? now / 40u : now / 80u));
+        for (k = 0; k < 8u; k++)
+            h = sig_add(h, (uint32_t)synth_param(ch, SP_E0 + k));
+        h = sig_add(h, play_keys_state(&lit, t1, t2) ^ lit);
+        h = sig_str(sig_str(h, t1), t2);
+        h = sig_str(h, silent_why(ch) ? silent_why(ch) : "");
+        if (h != ui.sig_row[1]) {
+            ui.sig_row[1] = h;
+            anim_step(ch, now);          /* (the frame's sound and dots once, then each band) */
+            for (k = 0; k < 2u; k++)
+                draw_play_anim(k, now);
+        }
+    } else if (mode == 9u + GR_N) {
+        h = sig_str(sig_add(2166136261u, (uint32_t)ui.name_ch << 8 | ui.name_cur), ui.name);
+        h = sig_add(h, blink);
+        if (h != ui.sig_row[0]) {
+            ui.sig_row[0] = h;
+            for (i = 0; i < 2u; i++)
+                draw_name(i, blink);
         }
     } else if (mode >= 3u + GR_N) {
         h = seqview_sig();
@@ -3388,22 +3988,6 @@ static void draw(uint32_t now)
             ui.sig_row[0] = h;
             for (i = 0; i < 2u; i++)
                 draw_graph(i, gk);
-        }
-    } else if (mode == 0u) {
-        for (i = 0; i < NCH; i++) {
-            const sound_t *s = synth_sound(i);
-            int32_t pos = seq_pos(i);
-            h = sig_add(2166136261u, i == set.channel);
-            h = sig_add(h, (uint32_t)synth_audible(i) << 2 | (seq_mute() >> i & 1u) << 1 | (seq_solo() >> i & 1u));
-            h = sig_add(h, (uint32_t)s->engine << 8 | s->preset);
-            h = sig_add(h, seq_cells(i, sel_bar(i)));
-            h = sig_add(h, pos >= 0 ? (uint32_t)pos / TPS : 0xFFFFu);
-            h = sig_add(h, ui.lvl[i]);
-            h = sig_add(h, (uint32_t)(seq_rec() != REC_OFF && seq_rec_ch() == i));
-            if (h != ui.sig_row[i]) {
-                ui.sig_row[i] = h;
-                draw_row(i);
-            }
         }
     } else if (mode == 2u) {             /* SETTINGS: the whole screen below the top bar, the footer too */
         uint32_t r;
@@ -3457,6 +4041,20 @@ static void draw(uint32_t now)
     }
 }
 
+static void draw(uint32_t now)
+{
+#ifdef PLAT_HOST
+    struct timespec a, b;
+    clock_gettime(CLOCK_MONOTONIC, &a);
+    draw_(now);
+    clock_gettime(CLOCK_MONOTONIC, &b);
+    draw_ns += (uint64_t)(b.tv_sec - a.tv_sec) * 1000000000u + (uint64_t)(b.tv_nsec - a.tv_nsec);
+    draw_n++;
+#else
+    draw_(now);
+#endif
+}
+
 void app_ui_init(void)
 {
     uint32_t ch, k;
@@ -3465,9 +4063,18 @@ void app_ui_init(void)
     ui.theme_drawn = 0xFF;
     ui.layer = -1;
     ui.held_step = -1;
+    ui.logo_on = 1;
+    ui.logo_t0 = plat_ms();
+    ui.input_t = ui.logo_t0;
     ui.save_key = -1;
+    if (boot_reset) {
+        app_say("SETTINGS RESET", "SONGS KEPT");
+        ui.msg_until = plat_ms() + 5000u;
+    }
+    ui.edit_key = -1;
     ui.page = PG_HOME;
     ui.group_btn = B_HOME;
+    ui.loop = prefs.home_view;
     ui.lock_id = SP_CUT;
     slot_pick = (uint8_t)seq_slot();
     for (ch = 0; ch < NCH; ch++)
@@ -3477,9 +4084,27 @@ void app_ui_init(void)
             ui.key_note[k][ch] = -1;
 }
 
+static int factory_step(void);
+static void factory_start(void);
 void app_frame(void)
 {
     uint32_t i, now = plat_ms();
+    if (factory_step())                  /* (a factory reset under way: nothing else, the ring filling) */
+        return;
+    if (ui.fr_hold) {                    /* FACTORY RESET: PLAY held; let go early, nothing happens */
+        if (!(ui.btn >> B_PLAY & 1u)) {
+            ui.fr_hold = ui.fr_arm = 0;
+            app_say("FACTORY RESET", "NOT DONE");
+        } else if (now - ui.fr_hold >= 3000u) {
+            ui.fr_hold = ui.fr_arm = 0;
+            factory_start();
+            return;
+        } else {
+            char c[8] = "HOLD  S";
+            c[5] = (char)('0' + (3000u - (now - ui.fr_hold) + 999u) / 1000u);
+            app_say("FACTORY RESET", c);
+        }
+    }
     input();
     cc_poll();
     if (pv.note >= 0 && (int32_t)(now - pv.until) >= 0)
@@ -3508,9 +4133,9 @@ void app_frame(void)
     }
     {
         static uint32_t shed_seen;       /* the overload guard faded a note: said, so it is never silent for no reason */
-        if (sheds != shed_seen) {
+        if (synth_budget_sheds() != shed_seen) {
             static uint32_t shed_at;
-            shed_seen = sheds;
+            shed_seen = synth_budget_sheds();
             if (now - shed_at > 1000u) {
                 shed_at = now;
                 app_say("VOICE LIMIT", "CPU");
@@ -3528,9 +4153,38 @@ void app_frame(void)
             }
         }
     }
-    for (i = 0; i < NCH; i++) {              /* the meters: up at once, down ~0.4 s */
+    for (i = 0; i < NCH; i++) {              /* the meters: up at once, down ~0.4 s; a jump up: a note struck */
         uint8_t p = meter_px(synth_peak(i));
+        if (p > ui.lvl[i] + 12u)
+            ui.pulse_t[i] = now ? now : 1u;
         ui.lvl[i] = p > ui.lvl[i] ? p : ui.lvl[i] > 4u ? (uint8_t)(ui.lvl[i] - 4u) : 0u;
+    }
+    if (seq_take_kept())
+        app_say("KEPT", "LAST TAKE");    /* (a REPLACE pass stopped short) */
+    {                                        /* playing or recording: LOOP (the channels), while it lasts */
+        int busy = seq_playing() || seq_rec() != REC_OFF;
+        if (!busy)
+            ui.loop_user = 0;
+        if (busy && !ui.loop && !prefs.loop_manual && !ui.loop_user) {
+            ui.loop = 1;
+            ui.loop_auto = 1;
+        } else if (!busy && ui.loop_auto) {
+            ui.loop = 0;
+            ui.loop_auto = 0;
+        }
+    }
+    {                                        /* the four channels shown: the selected one among them, sliding */
+        int32_t top = ui.pv_top, goal;
+        if ((int32_t)set.channel < top)
+            top = set.channel;
+        else if ((int32_t)set.channel > top + 3)
+            top = (int32_t)set.channel - 3;
+        ui.pv_top = (uint8_t)clamp(top, 0, NCH - 4);
+        goal = ui.pv_top * 8 * 42;           /* (in 1/8 of a row of 42: each view scales it to its own rows) */
+        if (ui.pv_y != goal) {
+            int32_t d = (goal - ui.pv_y) / 4;
+            ui.pv_y = (int16_t)(ui.pv_y + (d ? d : goal > ui.pv_y ? 1 : -1));
+        }
     }
     /* what the FM-1 keeps, written when it is quiet: the settings after 2 s, the song (AUTOSAVE) after 3 s stopped */
     if (set_dirty && now - set_dirty_at > 2000u && now - ui.input_t > 1000u && !seq_playing()) {
@@ -3541,6 +4195,26 @@ void app_frame(void)
         && now > 5000u) {
         if (seq_save(seq_slot()) != 0)
             prefs.autosave = 0;              /* (a song too big for its slot: no more tries; SAVE says why) */
+    }
+    if (ui.logo_on) {                    /* the boot animation, ~1.3 s; anything touched ends it */
+        uint32_t t = now - ui.logo_t0;
+        if (t >= LOGO_MS + 200u || (int32_t)(ui.input_t - ui.logo_t0) > 0) {
+            ui.logo_on = 0;
+            ui.theme_drawn = 0xFF;           /* (the screen drawn afresh) */
+            if (fresh_build) {               /* (a new build's first start: said on the logo and after it, once) */
+                fresh_build = 0;
+                app_say("INSTALLED", APP_VERSION);
+                ui.msg_until = now + 4000u;
+                prefs.seen_build = (uint32_t)FM1B_BUILD;
+                app_mark();
+            }
+        } else {
+            if (now - ui.logo_drawn >= 30u) {
+                ui.logo_drawn = now;
+                logo_frame(t > LOGO_MS ? LOGO_MS : t, prefs.display);
+            }
+            return;
+        }
     }
     lights(now);
     draw(now);

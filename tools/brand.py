@@ -19,6 +19,42 @@ from pathlib import Path
 
 LOGOS = Path(__file__).resolve().parents[1] / "assets"
 LOGO_DARK, LOGO_LIGHT = "logotype-dark.svg", "logotype-light.svg"     # white "null" for dark pages, black for light
+MARKS = ("mark-dark.svg", "mark-light.svg", "wordmark-dark.svg", "wordmark-light.svg")   # the installer's lockup
+
+# the installer: the logo through every step, its mark inside a ring that fills as the progress bar does (the page's
+# own <progress id="bar">, read four times a second), the lettering under it; dark and light
+INSTALL = """
+<style>
+.nw-install { display: flex; flex-direction: column; align-items: center; gap: 14px; margin: 8px 0 24px; }
+.nw-install .ring { position: relative; width: 168px; height: 168px; }
+.nw-install svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.nw-install .trk { fill: none; stroke: var(--rule, #333333); stroke-width: 4; }
+.nw-install .arc { fill: none; stroke: #E5202E; stroke-width: 4; stroke-linecap: round;
+  transition: stroke-dashoffset .25s linear; }
+.nw-install .mark { position: absolute; inset: 14px; width: 140px; height: 140px; }
+.nw-install .word { height: 44px; width: auto; }
+.nw-install .lt { display: none; }
+@media (prefers-color-scheme: light) { .nw-install .lt { display: block; } .nw-install .dk { display: none; } }
+@media (prefers-reduced-motion: reduce) { .nw-install .arc { transition: none; } }
+</style>
+<div class="nw-install" aria-hidden="true">
+  <div class="ring">
+    <svg viewBox="0 0 168 168"><circle class="trk" cx="84" cy="84" r="80"/><circle class="arc" cx="84" cy="84" r="80"/></svg>
+    <img class="mark dk" src="{a}/mark-dark.svg" alt=""><img class="mark lt" src="{a}/mark-light.svg" alt="">
+  </div>
+  <img class="word dk" src="{a}/wordmark-dark.svg" alt=""><img class="word lt" src="{a}/wordmark-light.svg" alt="">
+</div>
+<script>
+addEventListener("DOMContentLoaded", () => {   /* (the bar comes later in the page) */
+  const arc = document.querySelector(".nw-install .arc"), bar = document.getElementById("bar"), C = 2 * Math.PI * 80;
+  arc.setAttribute("stroke-dasharray", C.toFixed(2));
+  const show = () => arc.setAttribute("stroke-dashoffset",
+                                      (C * (1 - Math.max(0, Math.min(100, +bar.value || 0)) / 100)).toFixed(2));
+  show();
+  setInterval(show, 250);
+});
+</script>
+"""
 RED = "#E5202E"
 DARK = {"bg": "#000000", "fg": "#FFFFFF", "dim": "#8A8A8A", "line": "#333333", "card": "#111111",
         "tint": "#3A0B0F", "scheme": "dark"}
@@ -92,6 +128,9 @@ def brand(path, root):
     assets = Path(os.path.relpath(root / "assets", path.parent)).as_posix()
     home = Path(os.path.relpath(root, path.parent)).as_posix() + "/"
     html = html.replace("</head>", style("PANEL_CSS" in html) + "</head>", 1)
+    if '<progress id="bar"' in html:       # the installer: the logo and its ring of progress, above everything
+        at = re.search(r"<main[^>]*>", html) or re.search(r"<body[^>]*>", html)
+        html = html[:at.end()] + INSTALL.replace("{a}", assets) + html[at.end():]
     h1 = re.search(r"<h1>\s*nullwave\s*</h1>", html)
     if h1:                                      # a heading that is only the name: the logotype in its place
         html = html[:h1.start()] + f'<h1 class="nw-logo">{logo(assets, 72)}</h1>' + html[h1.end():]
@@ -115,7 +154,7 @@ def main(args):
         if not root.is_dir():
             sys.exit(f"brand: {root} is not a directory")
         (root / "assets").mkdir(exist_ok=True)
-        for f in (LOGO_DARK, LOGO_LIGHT):
+        for f in (LOGO_DARK, LOGO_LIGHT) + MARKS:
             shutil.copyfile(LOGOS / f, root / "assets" / f)
         for f in sorted(root.rglob("*.html")):
             done += brand(f, root)

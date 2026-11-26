@@ -110,6 +110,7 @@ static const fm6_patch_t *fm6_patch(uint32_t part, int32_t slot)
 /* the operators of a voice */
 typedef struct { uint32_t ph; float env, out1, out2; uint8_t st; } fm6_opst_t;
 static fm6_opst_t fm6_vs[NPART][NVOICE][6];
+static uint8_t fm6_mute[NPART];           /* EDIT held, an OP key held long: that operator silent (bit o) */
 
 static float fm6_amp_t[100], fm6_rate_t[100];   /* (worked out once: no exp2f a block) */
 static void fm6_tables(void)
@@ -155,13 +156,17 @@ static void fm6_note_on_(track_t *t, voice_t *v)
 static int32_t fm6_amp_hook(track_t *t, voice_t *v, int32_t adsr)
 {
     uint32_t part = (uint32_t)(t - trk) % NPART, k = (uint32_t)(v - t->v) % NVOICE, o;
+    const fm6_patch_t *pt = fm6_patch(part, clamp(t->p[P_E7], 0, 40));
+    int32_t alg = t->p[P_E0] > 0 ? clamp(t->p[P_E0], 1, 32) - 1 : pt->alg % 32u;
+    uint32_t car = FM6_ALG[alg].car;
     float sum = 0.0f;
     (void)adsr;
-    for (o = 0; o < 6u; o++)
-        sum += fm6_vs[part][k][o].env;
+    for (o = 0; o < 6u; o++)             /* (what is heard: the carriers; a modulator's long tail alone is silence) */
+        if (car >> o & 1u)
+            sum += fm6_vs[part][k][o].env * fm6_amp(pt->op[o].level);
     v->active = 1;
     v->env = 1 << 24;                    /* (keeps the host's envelope from ending it) */
-    if (!v->gate && sum < 0.01f) {
+    if (!v->gate && sum < 0.004f * fm6_amp(99)) {   /* (let go and ~-48 dB: the voice is free, its work stops) */
         v->active = 0;
         v->stage = 0;
         return 0;
@@ -300,7 +305,7 @@ static void fm6_render(track_t *t, voice_t *v, int32_t *out, uint32_t n, const v
             bk.e[o] = dl[o] * lvl[o] * (1.0f / 32768.0f);
             bk.de[o] = (s[o].env - dl[o]) * lvl[o] * (1.0f / 32768.0f) / (float)n;
             bk.inc[o] = inc[o];
-            bk.act[o] = lvl[o] > 0.0f && (dl[o] > 0.0f || s[o].env > 0.0f);
+            bk.act[o] = lvl[o] > 0.0f && (dl[o] > 0.0f || s[o].env > 0.0f) && !(fm6_mute[part] >> o & 1u);
         }
         fm6_ops_far(&bk, s, buf, n > CTL ? CTL : n);   /* (through a pointer: RAM is out of a direct call's reach) */
         for (i = 0; i < n && i < CTL; i++) {

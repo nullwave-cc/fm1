@@ -2,11 +2,9 @@
 #   app/build/host/nullwave_host app/tests/engines.txt app/build/host
 wait 600
 # The engines in their order (ANALOG 0, FM6 1, PHASE 2, LOFI 3, SAMPLE 4, VOICE 5, TRIO 6, WHEEL 7, GRAIN 8,
-# PHYS 9, NOISE 10, SLICE 11, DRUM 12): channel 1 a DRUM kit, then ANALOG, FM6, SAMPLE, WHEEL, PHASE; ALGORITHM picks
-# the channel
+# PHYS 9, NOISE 10, SLICE 11, DRUM 12): ANALOG, FM6, SAMPLE, WHEEL, PHASE, then channel 6 a DRUM kit; ALGORITHM
+# picks the channel
 expect channel 0
-expect engine 12
-turn ALGO 1
 expect engine 0
 turn ALGO 1
 expect engine 1
@@ -16,6 +14,8 @@ turn ALGO 1
 expect engine 7
 turn ALGO 1
 expect engine 2
+turn ALGO 1
+expect engine 12
 turn ALGO 1
 expect channel 0
 # MIDI channel n plays channel n, whatever is selected: every channel sounds
@@ -45,12 +45,13 @@ expect peak_db_min -40
 midi 84 3C 00
 wait 1500
 peakreset
-midi 95 3C 64
+midi 95 24 64
 wait 300
 expect peak_db_min -40
-midi 85 3C 00
+midi 85 24 00
 wait 1500
-# the kit: its eight lanes on the white keys, twice over
+# the kit (channel 6): its eight lanes on the white keys, twice over
+turn ALGO -1
 peakreset
 key 0 down 100
 wait 120
@@ -149,53 +150,53 @@ key 26 up
 wait 400
 # a hit plays out: no note-off ends it
 wait 4000
-midi 90 24 64
-midi 80 24 00
+midi 95 24 64
+midi 85 24 00
 wait 20
-expect voices1 1
+expect voices6 1
 wait 3000
-expect voices1 0
-# PRESETS: every engine's sounds in one list, engine by engine, the DRUM kits last
+expect voices6 0
+# PRESETS: every engine's sounds in one list, engine by engine, the DRUM kits, then SUPER's, last
 turn ALGO 1
 turn PRESET -1
-expect engine 12
+expect engine 13
 turn PRESET 1
 expect engine 0
 expect preset 0
 # chords: several voices on one channel (SOFT PAD plays poly; SAW LEAD, the first, is mono)
 turn PRESET 1
-midi 91 3C 64
-midi 91 40 64
-midi 91 43 64
+midi 90 3C 64
+midi 90 40 64
+midi 90 43 64
 wait 10
 expect voices 3
-midi 81 3C 00
-midi 81 40 00
-midi 81 43 00
+midi 80 3C 00
+midi 80 40 00
+midi 80 43 00
 wait 1500
 expect voices 0
 # GLO held: F4-D5 mute channels 1-6, the black keys F#4-F#5 solo them (G#4: channel 2); the synth honours them
 wait 3000
 press GLO
 wait 30
-key 14 down 100
+key 12 down 100
 wait 20
-key 14 up
+key 12 up
 wait 20
 release GLO
-expect mute 2
+expect mute 1
 expect audible 0
 peakreset
-midi 91 3C 64
+midi 90 3C 64
 wait 300
 expect peak_db_max -90
-midi 81 3C 00
+midi 80 3C 00
 wait 4000
 press GLO
 wait 30
-key 14 down 100
+key 12 down 100
 wait 20
-key 14 up
+key 12 up
 key 15 down 100
 wait 20
 key 15 up

@@ -57,12 +57,15 @@ static track_t trk[NPART];
 #include "eng_voice.c"
 #include "eng_phys.c"
 #include "eng_drum.c"
+#include "eng_super.c"
 
-/* the thirteen engines, in the PRESETS order */
+/* the fourteen engines, by number (kept in songs and presets: a new one goes at the end); PRESETS lists them in
+ * KIND_ORDER */
 static const engine_t *const ENGINES[] = {&ENG_ANALOG, &ENG_FM6, &ENG_PHASE, &ENG_LOFI, &ENG_SAMPLE, &ENG_VOICE,
                                           &ENG_TRIO, &ENG_WHEEL, &ENG_GRAIN, &ENG_PHYS, &ENG_NOISE, &ENG_SLICE,
-                                          &ENG_DRUM};
-enum { E_ANALOG, E_FM6, E_PHASE, E_LOFI, E_SAMPLE, E_VOICE, E_TRIO, E_WHEEL, E_GRAIN, E_PHYS, E_NOISE, E_SLICE, E_DRUM };
+                                          &ENG_DRUM, &ENG_SUPER};
+enum { E_ANALOG, E_FM6, E_PHASE, E_LOFI, E_SAMPLE, E_VOICE, E_TRIO, E_WHEEL, E_GRAIN, E_PHYS, E_NOISE, E_SLICE, E_DRUM,
+       E_SUPER };
 #define NENG ((uint32_t)NELEM(ENGINES))
 
 /* ------------------------------------------------------------- the state --- */
@@ -87,6 +90,8 @@ static struct { uint8_t on, ch, note, vel; } q[QN];   /* on: 0 off, 1 on, 2 pres
 static volatile uint32_t q_w, q_r;
 static volatile uint8_t all_off, silence;
 static int16_t shed_q[NPART][NVOICE];     /* a voice being shed: its fade, Q15 (32767: not) */
+static volatile uint32_t budget_sheds;    /* voices the budget faded (the screen says VOICE LIMIT) */
+uint32_t synth_budget_sheds(void) { return budget_sheds; }
 
 /* --------------------------------------------------------------- tables --- */
 static void times_init(void)
@@ -130,7 +135,7 @@ static const char *const N_FLT[] = {"OFF", "LP", "HP", "BP"};
 static const char *const N_INS[] = {"OFF", "SOFT", "HARD", "FOLD", "FUZZ", "CRUSH", "PHASR", "FLANG", "CHOR"};
 static const char *const N_SLC[] = {"OFF", "GATE", "STUT"};
 static const char *const N_SLCR[] = {"1/8", "1/16", "1/32", "8T", "16T", "32T"};
-static const char *const N_WAVE[] = {"SIN", "TRI", "SAW", "SQR", "S&H"};
+static const char *const N_WAVE[] = {"SIN", "TRI", "SAW", "SQR", "S&H", "RND"};   /* RND: a smooth random */
 static const char *const N_LSYNC[] = {"OFF", "4BAR", "2BAR", "1BAR", "1/2", "1/4", "1/8", "8T", "1/16", "16T", "1/32"};
 static const char *const N_TRIG[] = {"NOTE", "FREE"};
 static const char *const N_POL[] = {"BI", "UNI"};
@@ -164,7 +169,7 @@ static const struct { uint16_t off; uint8_t sgn; param_desc_t d; } SPX[SP_X0 - S
     [SP_SLC_RATE - SP_FENV] = {SOFF(slc_rate), 0, {"RATE", F_ENUM, 0, 5, 1, N_SLCR, 0}},
     [SP_SLC_DEPTH - SP_FENV] = {SOFF(slc_depth), 0, {"DEPTH", F_PCT, 0, 127, 127, 0, 0}},
     [SP_LFO_RATE - SP_FENV] = {SOFF(lfo_rate), 0, {"RATE", F_INT, 0, 127, 40, 0, 0}},
-    [SP_LFO_WAVE - SP_FENV] = {SOFF(lfo_wave), 0, {"WAVE", F_ENUM, 0, 4, 0, N_WAVE, 0}},
+    [SP_LFO_WAVE - SP_FENV] = {SOFF(lfo_wave), 0, {"WAVE", F_ENUM, 0, 5, 0, N_WAVE, 0}},
     [SP_LFO_PHASE - SP_FENV] = {SOFF(lfo_phase), 0, {"PHS", F_INT, 0, 127, 0, 0, 0}},
     [SP_LFO_FADE - SP_FENV] = {SOFF(lfo_fade), 0, {"FADE", F_TIME, 0, 127, 0, 0, 0}},
     [SP_LFO_SYNC - SP_FENV] = {SOFF(lfo_sync), 0, {"SYNC", F_ENUM, 0, 10, 0, N_LSYNC, 0}},
@@ -198,9 +203,52 @@ static const param_desc_t D_LANE[8] = {
     {"HATCL", F_INT, 0, 127, 100, 0, 0}, {"HATOP", F_INT, 0, 127, 100, 0, 0}, {"TOM", F_INT, 0, 127, 100, 0, 0},
     {"RIM", F_INT, 0, 127, 100, 0, 0}, {"BELL", F_INT, 0, 127, 100, 0, 0}};
 static const param_desc_t D_NOX = {"-", F_INT, 0, 0, 0, 0, 0};
+/* the channel's modulation (synth_mod_t): ENV 2 and the four slots */
+static const char *const N_MSRC[MS_N] = {"OFF", "ENV", "ENV2", "LFO", "VEL", "PRS", "RND"};
+static const char *const N_MDST[MT_N] = {"OFF", "CUT", "PIT", "SHP", "AMP", "PAN", "LFO"};
+static const param_desc_t D_E2[4] = {{"ATK", F_TIME, 0, 127, 0, 0, 0}, {"DEC", F_TIME, 0, 127, 40, 0, 0},
+                                     {"SUS", F_PCT, 0, 127, 0, 0, 0}, {"REL", F_TIME, 0, 127, 20, 0, 0}};
+static const param_desc_t D_MSRC = {"SRC", F_ENUM, 0, MS_N - 1, 0, N_MSRC, 0};
+static const param_desc_t D_MDST = {"DEST", F_ENUM, 0, MT_N - 1, 0, N_MDST, 0};
+static const param_desc_t D_MAMT = {"AMT", F_INT, -64, 63, 0, 0, 0};
+static synth_mod_t smod[NCH];            /* each channel's (the main loop's; the render reads it, as snd) */
+void synth_default_mod(synth_mod_t *m)
+{
+    memset(m, 0, sizeof *m);
+    m->ver = SYN_MOD_VER;
+    m->e2[0] = 0;
+    m->e2[1] = 40;
+    m->e2[2] = 0;
+    m->e2[3] = 20;
+    m->m[0].src = MS_ENV2;               /* (slot 1 ready as a filter envelope: turn its AMT) */
+    m->m[0].dst = MT_CUT;
+}
+int synth_mod_ok(const synth_mod_t *m)
+{
+    uint32_t k;
+    if (m->ver != SYN_MOD_VER)
+        return 0;
+    for (k = 0; k < 4u; k++)
+        if (m->e2[k] > 127u)
+            return 0;
+    for (k = 0; k < SYN_MODS; k++)
+        if (m->m[k].src >= MS_N || m->m[k].dst >= MT_N || m->m[k].amt < -64)
+            return 0;
+    return 1;
+}
+void synth_set_mod(uint32_t ch, const synth_mod_t *m)
+{
+    synth_mod_t d;
+    if (!synth_mod_ok(m)) {
+        synth_default_mod(&d);
+        m = &d;
+    }
+    smod[ch % NCH] = *m;
+}
+const synth_mod_t *synth_mod(uint32_t ch) { return &smod[ch % NCH]; }
 
-/* the default sounds: channel 1 a drum kit, then a bass, a lead, chords, keys and a pad */
-static const uint8_t DEF_ENG[NCH] = {E_DRUM, E_ANALOG, E_FM6, E_SAMPLE, E_WHEEL, E_PHASE};
+/* the default sounds: a lead, keys, chords, an organ and a pad, then the drum kit last (channel 6, named DRUMS) */
+static const uint8_t DEF_ENG[NCH] = {E_ANALOG, E_FM6, E_SAMPLE, E_WHEEL, E_PHASE, E_DRUM};
 
 static void sound_from_preset(sound_t *s, uint32_t engine, uint32_t preset)
 {
@@ -247,6 +295,9 @@ static const param_desc_t *desc_of(uint32_t ch, uint32_t pi)
     case SP_FTYPE: return &D_FTYPE;
     default: break;
     }
+    if (pi >= SP_E2_ATK && pi < SP_N)    /* the channel's modulation */
+        return pi < SP_M1_SRC ? &D_E2[pi - SP_E2_ATK] : (pi - SP_M1_SRC) % 3u == 0u ? &D_MSRC
+             : (pi - SP_M1_SRC) % 3u == 1u ? &D_MDST : &D_MAMT;
     if (pi >= SP_X0)                     /* an engine's extras: DRUM's lanes */
         return snd[ch].engine == E_DRUM && pi - SP_X0 < 8u ? &D_LANE[pi - SP_X0] : &D_NOX;
     if (pi >= SP_FENV)
@@ -277,8 +328,10 @@ int synth_sound_ok(const sound_t *s)
 
 const sound_t *synth_sound(uint32_t ch) { return &snd[ch % NCH]; }
 
+static char sname[NCH][SYN_NAME + 1];    /* a channel's own name (a user preset's, the editor's), "" the preset's */
 static void sound_put(uint32_t ch, const sound_t *s)
 {
+    sname[ch][0] = 0;                    /* (a new sound: its preset's name, until a user preset names it) */
     synth_ch_off(ch);                    /* (the render resets the track when the engine changed) */
     snd[ch] = *s;
     if (ENGINES[s->engine]->oneshot)
@@ -320,7 +373,27 @@ const char *synth_engine_name(uint32_t engine) { return ENGINES[engine % NENG]->
 const char *synth_preset_name(uint32_t ch)
 {
     const sound_t *s = &snd[ch % NCH];
-    return ENGINES[s->engine]->presets[s->preset].name;
+    return sname[ch % NCH][0] ? sname[ch % NCH] : ENGINES[s->engine]->presets[s->preset].name;
+}
+const char *synth_own_name(uint32_t ch) { return sname[ch % NCH]; }   /* "": the preset's */
+/* the channel's sound named (a user preset, a preset from the editor): capitals, digits and - . / + # & kept, the
+ * rest a space, SYN_NAME at most; 0 or "" its preset's name again */
+void synth_set_name(uint32_t ch, const char *nm, uint32_t len)
+{
+    uint32_t i, k = 0;
+    ch %= NCH;
+    for (i = 0; nm && i < len && nm[i] && k < SYN_NAME; i++) {
+        char c = nm[i];
+        if (c >= 'a' && c <= 'z')
+            c = (char)(c - 32);
+        if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '.' || c == '/' || c == '+' ||
+              c == '#' || c == '&'))
+            c = ' ';
+        sname[ch][k++] = c;
+    }
+    while (k && sname[ch][k - 1] == ' ')
+        k--;
+    sname[ch][k] = 0;
 }
 const char *synth_page_title(uint32_t ch, uint32_t page) { return ENGINES[snd[ch % NCH].engine]->page_title[page & 1u]; }
 int synth_is_kit(uint32_t ch) { return ENGINES[snd[ch % NCH].engine]->oneshot; }
@@ -335,7 +408,8 @@ int32_t synth_key_note(uint32_t ch, uint32_t k)
 
 /* PRESETS: every engine's sounds in one list, engine by engine */
 static const uint8_t KIND_ORDER[NENG] = {E_ANALOG, E_FM6, E_PHASE, E_LOFI, E_SAMPLE, E_VOICE, E_TRIO, E_WHEEL,
-                                        E_GRAIN, E_PHYS, E_NOISE, E_SLICE, E_DRUM};
+                                        E_GRAIN, E_PHYS, E_NOISE, E_SLICE, E_DRUM, E_SUPER};   /* (a new engine after the
+                                        * rest: the favourites, marked by their place in the list, stay theirs) */
 uint32_t synth_nsounds(void)
 {
     uint32_t e, n = 0;
@@ -373,6 +447,8 @@ void synth_sound_pick(uint32_t ch, uint32_t index)
 /* ------------------------------------------------------- the parameters --- */
 static int32_t sp_get(const sound_t *s, uint32_t id)
 {
+    if (id >= SP_E2_ATK)                 /* (the modulation's: not the sound's) */
+        return 0;
     if (id < SYN_NPARAM)
         return s->p[id];
     if (id >= SP_X0)
@@ -384,6 +460,8 @@ static int32_t sp_get(const sound_t *s, uint32_t id)
 }
 static void sp_put(sound_t *s, uint32_t id, int32_t v)
 {
+    if (id >= SP_E2_ATK)
+        return;
     if (id < SYN_NPARAM)
         s->p[id] = (int16_t)v;
     else if (id >= SP_X0) {
@@ -393,7 +471,36 @@ static void sp_put(sound_t *s, uint32_t id, int32_t v)
         ((uint8_t *)s)[SPX[id - SP_FENV].off] = (uint8_t)v;
 }
 
-int32_t synth_param(uint32_t ch, uint32_t id) { return sp_get(&snd[ch % NCH], id); }
+static int32_t mod_get(uint32_t ch, uint32_t id)
+{
+    const synth_mod_t *m = &smod[ch % NCH];
+    uint32_t k;
+    if (id < SP_M1_SRC)
+        return m->e2[id - SP_E2_ATK];
+    k = id - SP_M1_SRC;
+    return k % 3u == 0u ? m->m[k / 3u].src : k % 3u == 1u ? m->m[k / 3u].dst : m->m[k / 3u].amt;
+}
+static void mod_put(uint32_t ch, uint32_t id, int32_t v)
+{
+    synth_mod_t *m = &smod[ch % NCH];
+    uint32_t k;
+    if (id < SP_M1_SRC) {
+        m->e2[id - SP_E2_ATK] = (uint8_t)v;
+        return;
+    }
+    k = id - SP_M1_SRC;
+    if (k % 3u == 0u)
+        m->m[k / 3u].src = (uint8_t)v;
+    else if (k % 3u == 1u)
+        m->m[k / 3u].dst = (uint8_t)v;
+    else
+        m->m[k / 3u].amt = (int8_t)v;
+}
+
+int32_t synth_param(uint32_t ch, uint32_t id)
+{
+    return id >= SP_E2_ATK && id < SP_N ? mod_get(ch, id) : sp_get(&snd[ch % NCH], id);
+}
 void synth_param_range(uint32_t ch, uint32_t id, int32_t *lo, int32_t *hi)
 {
     const param_desc_t *d = desc_of(ch % NCH, id % SP_N);
@@ -411,7 +518,10 @@ void synth_param_set(uint32_t ch, uint32_t id, int32_t v)
     if (id >= SP_X0 && desc_of(ch, id) == &D_NOX)
         return;
     synth_param_range(ch, id, &lo, &hi);
-    sp_put(&snd[ch], id, clamp(v, lo, hi));
+    if (id >= SP_E2_ATK)
+        mod_put(ch, id, clamp(v, lo, hi));
+    else
+        sp_put(&snd[ch], id, clamp(v, lo, hi));
 }
 void synth_param_turn(uint32_t ch, uint32_t id, int32_t d)
 {
@@ -422,6 +532,12 @@ void synth_param_turn(uint32_t ch, uint32_t id, int32_t d)
     synth_param_set(ch, id, synth_param(ch, id) + d);
 }
 const char *synth_param_label(uint32_t ch, uint32_t id) { return desc_of(ch % NCH, id % SP_N)->label; }
+const char *const *synth_param_names(uint32_t ch, uint32_t id)   /* an enum's labels (min .. max), 0 a number */
+{
+    const param_desc_t *d = desc_of(ch % NCH, id % SP_N);
+    return d->fmt == F_ENUM ? d->names : 0;
+}
+int32_t synth_param_default(uint32_t ch, uint32_t id) { return desc_of(ch % NCH, id % SP_N)->def; }
 uint32_t synth_knob_param(uint32_t ch, uint32_t k) { return ENGINES[snd[ch % NCH].engine]->knob[k % SYN_KNOBS]; }
 
 static void num(int32_t v, char *b)
@@ -569,6 +685,12 @@ void synth_shed(void)
     if (best != 0xFFFFFFFFu)
         shed_q[bc][bk] = 32766;          /* (channel_block fades it out) */
 }
+int synth_fm6_mute(uint32_t ch, uint32_t op)   /* FM6: an operator silent or back; 1 silent */
+{
+    fm6_mute[ch % NPART] ^= (uint8_t)(1u << (op % 6u));
+    return fm6_mute[ch % NPART] >> (op % 6u) & 1u;
+}
+uint32_t synth_fm6_mutes(uint32_t ch) { return fm6_mute[ch % NPART]; }
 int synth_lane_mute(uint32_t ch, uint32_t lane)   /* DRUM: a lane muted or back; 1 muted now */
 {
     trk[ch % NCH].lmute ^= (uint8_t)(1u << (lane & 7u));
@@ -619,6 +741,28 @@ uint32_t synth_voices(uint32_t ch)
     uint32_t k, n = 0;
     for (k = 0; k < NVOICE; k++)
         n += trk[ch % NCH].v[k].active;
+    return n;
+}
+
+int synth_drum_lane(uint32_t note) { int l = (int)drum_lane(note); return l >= 0 && l < 8 ? l : -1; }
+
+uint32_t synth_voice_view(uint32_t ch, synth_vview_t *out)
+{
+    uint32_t k, n = 0;
+    ch %= NCH;
+    for (k = 0; k < NVOICE && k < SYN_VMAX; k++) {
+        const voice_t *v = &trk[ch].v[k];
+        int32_t a = last_amp[ch][k];
+        if (!v->active)
+            continue;
+        out[n].slot = (uint8_t)k;
+        out[n].note = v->note;
+        out[n].vel = v->vel;
+        out[n].gate = v->gate;
+        out[n].amp = (uint8_t)(a <= 0 ? 0 : a >= 32767 ? 255 : a >> 7);
+        out[n].start = v->age;
+        n++;
+    }
     return n;
 }
 
@@ -786,6 +930,76 @@ static int own_state(const engine_t *e)
 {
     return e == &ENG_PHYS || e == &ENG_SAMPLE || e == &ENG_GRAIN || e == &ENG_SLICE || e == &ENG_VOICE;
 }
+/* the voices' cost, all channels together: each engine's voice weighed (in 0.1 % of the FM-1's render time, from
+ * the host's measure, x40), their sum kept under a budget. A note that would go over it takes the place of the voice
+ * that matters least anywhere (one already let go, the quietest; else the oldest of the heaviest), faded over four
+ * blocks; and the budget follows the render's real load (synth_load, from app.c): tighter when a block runs long,
+ * back up when it is easy again. So a loop of FM6 chords with effects thins out a little before it can overload */
+static const uint8_t ENG_COST[] = {4, 40, 7, 2, 4, 29, 5, 17, 16, 13, 17, 3, 3, 59};   /* (synth.c ENGINES' order) */
+#define VB_DEF 650u                      /* the voices' share: 65 %, the rest the effects, the mix, the screen */
+#define VB_MIN 160u
+static uint32_t vbudget = VB_DEF, vb_easy;
+static uint32_t eng_cost(uint32_t ch) { return run_eng[ch] < sizeof ENG_COST ? ENG_COST[run_eng[ch]] : 10u; }
+static uint32_t voices_cost(void)        /* the voices sounding (not fading out), weighed */
+{
+    uint32_t ch, k, c = 0;
+    for (ch = 0; ch < NCH; ch++)
+        for (k = 0; k < NVOICE; k++)
+            if (trk[ch].v[k].active && shed_q[ch][k] == 32767)
+                c += eng_cost(ch);
+    return c;
+}
+static int voice_shed_one(int32_t except_ch, uint32_t except_k)   /* the voice that matters least, faded: 1 one was */
+{
+    uint32_t ch, k, bc = 0, bk = 0;
+    int64_t best = -1;
+    for (ch = 0; ch < NCH; ch++)
+        for (k = 0; k < NVOICE; k++) {
+            voice_t *v = &trk[ch].v[k];
+            int64_t score;
+            if (!v->active || shed_q[ch][k] != 32767 || ((int32_t)ch == except_ch && k == except_k))
+                continue;
+            /* (let go first, the quietest of them; then the heaviest, the oldest) */
+            score = !v->gate ? ((int64_t)1 << 40) + (32767 - (v->env_out < 0 ? 0 : v->env_out))
+                             : ((int64_t)eng_cost(ch) << 32) + (int64_t)(0xFFFFFFFFu - v->age);
+            if (score > best) {
+                best = score;
+                bc = ch;
+                bk = k;
+            }
+        }
+    if (best < 0)
+        return 0;
+    shed_q[bc][bk] = 32766;              /* (channel_block fades it out) */
+    budget_sheds++;
+    return 1;
+}
+static void voices_budget(uint32_t ch, uint32_t k)   /* a voice starts on ch: room made for it */
+{
+    uint32_t n = 0;
+    while (voices_cost() > vbudget && n++ < 4u && voice_shed_one((int32_t)ch, k))
+        ;
+}
+/* the render's load (app.c, x16 permille of a block's time): the budget tightened above ~72 %, a voice shed now above
+ * ~85 %; eased back after ~3 s under ~45 % */
+void synth_load(uint32_t p)
+{
+    uint32_t used;
+    if (p > 1150u) {
+        used = voices_cost();
+        vb_easy = 0;
+        if (used > VB_MIN && used < vbudget + 60u)
+            vbudget = used - (used > VB_MIN + 40u ? 40u : used - VB_MIN);
+        if (p > 1360u)
+            voice_shed_one(-1, 0);
+    } else if (p < 720u && vbudget < VB_DEF && ++vb_easy > 512u) {
+        vb_easy = 0;
+        vbudget += 20u;
+    }
+}
+uint32_t synth_budget(void) { return vbudget; }
+uint32_t synth_budget_used(void) { return voices_cost(); }
+
 static void voice_start(uint32_t ch, uint32_t note, uint32_t vel)
 {
     track_t *t = &trk[ch];
@@ -802,6 +1016,8 @@ static void voice_start(uint32_t ch, uint32_t note, uint32_t vel)
     v->vel = v->mvel = (uint8_t)vel;
     v->gate = 1;
     v->active = 1;
+    shed_q[ch][idx] = 32767;             /* (a voice taken while it faded: its own again) */
+    voices_budget(ch, idx);
     v->stage = 1;
     v->age = ++vage;
     shed_q[(uint32_t)(t - trk) % NPART][(uint32_t)(v - t->v) % NVOICE] = 32767;
@@ -1074,12 +1290,79 @@ static int32_t tune16, bend16[NCH];
 void synth_tune(int32_t cents) { tune16 = clamp(cents, -50, 50) * 16 / 100; }
 void synth_bend(uint32_t ch, int32_t v, uint32_t range) { bend16[ch % NCH] = v * (int32_t)range * 16 / 8192; }
 
+/* ENV 2, a voice each (as the volume's ADSR, from ENV 2's own times), and what the slots put on each target */
+static int32_t e2v[NCH][NVOICE];         /* Q24 */
+static uint8_t e2s[NCH][NVOICE];         /* 0 off, 1 attack, 2 decay / sustain, 3 release */
+static uint32_t e2age[NCH][NVOICE];
+static int32_t modq[NCH][MT_N];          /* the newest voice's sums (the screen; PAN and LFO depth, a channel's) */
+int32_t synth_mod_now(uint32_t ch, uint32_t dst) { return dst < MT_N ? modq[ch % NCH][dst] : 0; }
+#ifdef PLAT_HOST                        /* the host: where the render's time goes (expect prof: printed, then cleared) */
+#include <time.h>
+#include <stdio.h>
+static uint64_t prof_ns[8];
+static uint64_t prof_now(void)
+{
+    struct timespec q;
+    clock_gettime(CLOCK_MONOTONIC, &q);
+    return (uint64_t)q.tv_sec * 1000000000u + (uint64_t)q.tv_nsec;
+}
+#define PROF_T(v) uint64_t v = prof_now()
+#define PROF_ADD(i, v) (prof_ns[i] += prof_now() - (v))
+static const char *const PROF_NAME[8] = {"FM6 voices", "other voices", "voice control+mods", "channel filter",
+                                         "channel post (dst/insert/slicer)", "mix", "buses+master", "-"};
+void synth_prof_dump(uint32_t real_ms)
+{
+    uint32_t i;
+    for (i = 0; i < 7u; i++)
+        printf("  prof %-34s %5.2f %% of real time\n", PROF_NAME[i], (double)prof_ns[i] / 1e4 / (double)real_ms);
+    memset(prof_ns, 0, sizeof prof_ns);
+}
+#else
+#define PROF_T(v)
+#define PROF_ADD(i, v)
+#endif
+static int32_t cutq[NCH];                /* the newest voice's cutoff modulation, << 8 (the graph view) */
+int32_t synth_cut_mod(uint32_t ch) { return cutq[ch % NCH]; }
+
+static int32_t env2_tick(uint32_t ch, uint32_t k, const voice_t *v, const synth_mod_t *mo)
+{
+    int32_t *e = &e2v[ch][k], sus = (int32_t)mo->e2[2] << 17;
+    if (v->age != e2age[ch][k]) {        /* a new note in this voice: from the start */
+        e2age[ch][k] = v->age;
+        e2s[ch][k] = 1;
+        *e = 0;
+    }
+    if (!v->gate && e2s[ch][k] && e2s[ch][k] < 3u)
+        e2s[ch][k] = 3;
+    switch (e2s[ch][k]) {
+    case 1:
+        *e += atk_step[mo->e2[0] & 127u];
+        if (*e >= 1 << 24) {
+            *e = 1 << 24;
+            e2s[ch][k] = 2;
+        }
+        break;
+    case 2:
+        *e -= ((*e - sus) >> 9) * fall_k[mo->e2[1] & 127u] >> 6;
+        break;
+    case 3:
+        *e -= (*e >> 9) * fall_k[mo->e2[3] & 127u] >> 6;
+        if (*e < 0)
+            *e = 0;
+        break;
+    default:
+        break;
+    }
+    return *e >> 9;                      /* Q15 */
+}
+
 static void channel_block(uint32_t ch, int32_t *out, sound_t *s)
 {
     track_t *t = &trk[ch];
     const engine_t *e;
     uint32_t k;
     chmod_t cm;
+    uint32_t newest_age = 0;
     if (run_eng[ch] != s->engine)        /* another engine: its track from silence */
         track_reset(ch);
     e = ENGINES[run_eng[ch]];
@@ -1091,12 +1374,33 @@ static void channel_block(uint32_t ch, int32_t *out, sound_t *s)
         uint32_t nv = 0;
         for (k = 0; k < NVOICE; k++)
             nv += t->v[k].active;
-        lfo_block(ch, s, nv, &cm);
+        {
+            int need = 0;
+            for (k = 0; k < SYN_MODS; k++)
+                need |= smod[ch].m[k].src == MS_LFO && smod[ch].m[k].dst && smod[ch].m[k].amt;
+            lfo_block(ch, s, nv, &cm, need);
+        }
+        if (modq[ch][MT_LFO]) {          /* a slot on the LFO's depth (the last block's: the newest voice's) */
+            int32_t g = 32768 + modq[ch][MT_LFO];
+            g = g < 0 ? 0 : g > 65536 ? 65536 : g;
+            cm.pit16 = (cm.pit16 * g) >> 15;
+            cm.cut = (cm.cut >> 1) * (g >> 1) >> 13;
+            cm.shp = (cm.shp >> 1) * (g >> 1) >> 13;
+            cm.amp_q15 = 32767 - (((32767 - cm.amp_q15) >> 1) * (g >> 1) >> 13);
+        }
+    }
+    {
+        uint32_t newest = 0, any = 0;
+        for (k = 0; k < SYN_MODS; k++)
+            any |= smod[ch].m[k].src && smod[ch].m[k].dst && smod[ch].m[k].amt;
+        if (!any)
+            memset(modq[ch], 0, sizeof modq[ch]);
+        (void)newest;
     }
     for (k = 0; k < NVOICE; k++) {
         voice_t *v = &t->v[k];
         vmod_t m;
-        int32_t a, pr;
+        int32_t a, pr, md[MT_N];
         uint32_t base;
         if (!v->active)
             continue;
@@ -1123,6 +1427,31 @@ static void channel_block(uint32_t ch, int32_t *out, sound_t *s)
             a += (a * pr * (prs_mode == PRS_BOTH ? 1 : 2)) >> 9;
         a = a > 32767 ? 32767 : a;
         a = (a * cm.amp_q15) >> 15;      /* LFO -> AMP */
+        {                                /* the slots: each source times its amount, summed on its target */
+            const synth_mod_t *mo = &smod[ch];
+            int32_t src[MS_N], j;
+            src[MS_OFF] = 0;
+            src[MS_ENV] = v->env >> 9;
+            src[MS_ENV2] = env2_tick(ch, k, v, mo);
+            src[MS_LFO] = cm.lfo_q15;
+            src[MS_VEL] = (int32_t)(v->vel & 127u) * 258;
+            src[MS_PRS] = pr * 258;
+            src[MS_RND] = v->mrnd;
+            memset(md, 0, sizeof md);
+            for (j = 0; j < SYN_MODS; j++)
+                if (mo->m[j].src && mo->m[j].dst && mo->m[j].amt)
+                    md[mo->m[j].dst] += src[mo->m[j].src % MS_N] * mo->m[j].amt;
+            if (md[MT_AMP]) {
+                int32_t g = 32768 + (md[MT_AMP] >> 6);
+                a = (a * (g < 0 ? 0 : g > 65536 ? 65536 : g)) >> 15;
+                a = a > 32767 ? 32767 : a;
+            }
+            if (v->age >= newest_age) {  /* (the newest voice's, for the channel and the screen) */
+                newest_age = v->age;
+                for (j = 0; j < MT_N; j++)
+                    modq[ch][j] = clamp(md[j] >> 6, -32768, 32767);
+            }
+        }
         v->env_out = a;
         if (v->pitch_cur != v->pitch16) {   /* GLD: towards the note, a share a block */
             int32_t k16 = 32768 / (1 + s->glide * s->glide / 24);
@@ -1130,7 +1459,8 @@ static void channel_block(uint32_t ch, int32_t *out, sound_t *s)
             v->pitch_cur += d ? d : (v->pitch16 > v->pitch_cur ? 1 : -1);
         }
         {
-            int32_t p16 = v->pitch_cur + tune16 + bend16[ch] + cm.pit16 + ((s->penv * (v->env >> 9)) >> 15) * 384 / 63;
+            int32_t p16 = v->pitch_cur + tune16 + bend16[ch] + cm.pit16 + ((s->penv * (v->env >> 9)) >> 15) * 384 / 63
+                          + (md[MT_PIT] >> 15) * 384 / 63;
             base = pitch_inc((uint32_t)clamp(p16, 0, 2047));
             memset(&m, 0, sizeof m);
             m.pitch16 = p16;
@@ -1142,13 +1472,28 @@ static void channel_block(uint32_t ch, int32_t *out, sound_t *s)
         m.cutoff = (s->fenv * (v->env >> 9)) >> 7;   /* ENV -> FILTER: 63 opens it ~63 << 8 at the envelope's top */
         if (prs_mode == PRS_FILTER || prs_mode == PRS_BOTH)
             m.cutoff += pr * 97;         /* full pressure: the cutoff ~48 steps up */
-        m.cutoff += cm.cut;
-        m.shape = (64 << 8) + cm.shp + ((s->senv * (v->env >> 9)) >> 7);
+        m.cutoff += cm.cut + (md[MT_CUT] >> 7);
+        m.shape = (64 << 8) + cm.shp + ((s->senv * (v->env >> 9)) >> 7) + (md[MT_SHP] >> 7);
+        if (v->age >= newest_age)
+            cutq[ch] = m.cutoff;
         last_amp[ch][k] = a;
-        e->render(t, v, out, CTL, &m);
+        {
+            PROF_T(pr0);
+            e->render(t, v, out, CTL, &m);
+            PROF_ADD(run_eng[ch] == 1u ? 0 : 1, pr0);
+            (void)0;
+        }
     }
-    channel_filter(ch, s, out);
-    channel_post(ch, s, out);
+    {
+        PROF_T(pf0);
+        channel_filter(ch, s, out);
+        PROF_ADD(3, pf0);
+    }
+    {
+        PROF_T(pp0);
+        channel_post(ch, s, out);
+        PROF_ADD(4, pp0);
+    }
 }
 
 static int32_t level_q8(uint32_t l) { return (int32_t)(l * l * 256u / 10000u); }   /* 100: 1.0, 127: ~1.6 */
@@ -1207,7 +1552,11 @@ void synth_render(int32_t *lr, uint32_t n, uint32_t master_q12)
                 if (ovr[ch][id] != OVR_NONE)
                     sp_put(&live, id, ovr[ch][id]);
             memset(chb, 0, sizeof chb);
-            channel_block(ch, chb, &live);
+            {
+                PROF_T(pc0);
+                channel_block(ch, chb, &live);
+                PROF_ADD(2, pc0);        /* (the whole: the parts are taken off it in synth_prof_dump's reading) */
+            }
             for (i = 0; i < CTL; i++) {
                 int32_t a = chb[i] < 0 ? -chb[i] : chb[i];
                 pk = a > pk ? a : pk;
@@ -1222,6 +1571,8 @@ void synth_render(int32_t *lr, uint32_t n, uint32_t master_q12)
             if ((!c0 && !c1) || !pk)         /* (silent this block: nothing to mix) */
                 continue;
             mixed = 1;
+            if (modq[ch][MT_PAN])            /* a slot on PAN (the newest voice's) */
+                live.pan = (int8_t)clamp(live.pan + (modq[ch][MT_PAN] >> 9), -64, 63);
             gl = live.pan > 0 ? (63 - live.pan) * 260 >> 6 : 256;   /* the balance: the far side falls */
             gr = live.pan < 0 ? (64 + live.pan) * 256 >> 6 : 256;
             ds = throw_echo ? 127 : live.dly;   /* the throws: every channel's send full while held */
@@ -1248,6 +1599,7 @@ void synth_render(int32_t *lr, uint32_t n, uint32_t master_q12)
             done += len;
             continue;
         }
+        PROF_T(pb0);
         for (i = 0; i < len; i++) {
             int32_t g = g0 + (((g1 - g0) * (int32_t)i) >> CTL_LOG2), fx, dl = sdl[i], rv = srv[i];
             float l, r, lg;
@@ -1297,6 +1649,7 @@ void synth_render(int32_t *lr, uint32_t n, uint32_t master_q12)
             lr[2 * (done + i) + 1] = clamp(soft_knee((int32_t)(r * lg * 8388607.0f), 7000000), -8388607, 8388607);
             tp_frac += tick_per_smp;
         }
+        PROF_ADD(6, pb0);
         gain_q12 = g1;
         done += len;
     }
@@ -1314,6 +1667,7 @@ void synth_init(void)
                 shed_q[c][k] = 32767;
     }
     for (ch = 0; ch < NCH; ch++) {
+        synth_default_mod(&smod[ch]);
         synth_set_sound(ch, 0);
         track_reset(ch);
         synth_unlock(ch);

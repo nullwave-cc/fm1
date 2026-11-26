@@ -1,13 +1,9 @@
 # nullwave in the host simulator: ./build.sh --host, then
 #   app/build/host/nullwave_host app/tests/basic.txt app/build/host
 wait 600
-# the boot splash (app_splash): the mark and its ring, the wordmark, the version, on black at the edges
-expect splash_lit.20.145 >8000
-expect splash_lit.150.192 >1500
-expect splash_lit.212.228 >20
+# the boot screen (app_splash): the theme's background, the animation's first frame (nothing lit yet, app/tests/logo.txt)
 expect splash_lit.0.10 0
-shot boot.png
-# ALGORITHM picks the channel: channel 2 plays a synth (channel 1 is the kit)
+# ALGORITHM picks the channel: channel 2 plays a synth (FM6; the kit is channel 6)
 turn ALGO 1
 wait 30
 expect channel 1
@@ -54,7 +50,7 @@ expect peak_db_min -30
 midi 81 3C 00
 listen
 wait 100
-said nullwave. CHANNEL 2. ANALOG. SOFT PAD. OCTAVE +1
+said nullwave. CHANNEL 2. FM6. BELL. OCTAVE +1
 tap ARP
 wait 30
 expect page 45

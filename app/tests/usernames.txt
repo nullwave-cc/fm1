@@ -1,0 +1,74 @@
+# A user preset keeps its name (SAVE > USER, app.c user_t): saved with the sound's name, said as the slot turns, the
+# channel named so when it loads, over a power-on, and with the song; a preset from the editor brings its own (tests/editor_test.py).
+# Run by tests/run_tests.sh:
+#   app/build/host/nullwave_host app/tests/usernames.txt app/build/host
+wait 1800
+expect name:SAW_LEAD 1
+expect u05:EMPTY 1
+# SAVE opens on SONG; SELECT back one: USER (SLOT, LOAD, ERASE, SAVE)
+tap SAVE
+wait 30
+turn SELECT -1
+wait 30
+expect page 50
+turn K1 4
+wait 30
+turn K4 1
+wait 30
+turn K4 1
+wait 300
+expect u05:SAW_LEAD 1
+# another sound on the channel, then slot 5 loaded: its name again
+turn SELECT -1
+wait 30
+expect page 49
+turn K1 3
+wait 30
+expect name:SAW_LEAD 0
+turn SELECT 1
+wait 30
+turn K2 1
+wait 30
+turn K2 1
+wait 30
+expect name:SAW_LEAD 1
+# over a power-on
+reboot
+wait 1800
+expect u05:SAW_LEAD 1
+expect u06:EMPTY 1
+# kept with the song: SOFT PAD (the second sound) in slot 6, loaded, the song saved, a power-on: the channel's own name
+tap SAVE
+wait 30
+turn SELECT -2
+wait 30
+expect page 49
+turn K1 1
+wait 30
+expect name:SOFT_PAD 1
+expect own: 1
+turn SELECT 1
+wait 30
+expect page 50
+turn K1 1
+wait 30
+turn K4 1
+wait 30
+turn K4 1
+wait 300
+expect u06:SOFT_PAD 1
+turn K2 1
+wait 30
+turn K2 1
+wait 30
+expect own:SOFT_PAD 1
+tap SAVE
+wait 30
+tap SAVE
+wait 30
+tap SAVE
+wait 300
+reboot
+wait 1800
+expect name:SOFT_PAD 1
+expect own:SOFT_PAD 1

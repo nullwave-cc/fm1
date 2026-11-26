@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: MPL-2.0
+# For nullwave-cc/site (copy it there as .github/workflows/fm1.yml): the FM-1 pages and screens of a nullwave fm1
+# release into fm1/ and assets/screens/, as a pull request. By hand, with a version; it never pushes to main.
+name: FM-1 pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "nullwave fm1 version, X.Y.Z (its release must be published)"
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  pages:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: The release's pages and screens
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          printf '%s' "$VERSION" | grep -Eq '^[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}$'
+          gh release download "v$VERSION" --repo nullwave-cc/fm1 --pattern 'nullwave-fm1-*.tar.gz' --dir "$RUNNER_TEMP"
+          rm -rf fm1/installer-* fm1/installer fm1/emulator fm1/quick-start fm1/manual fm1/companion fm1/firmware
+          tar -xzf "$RUNNER_TEMP/nullwave-fm1-site-$VERSION.tar.gz" -C fm1
+          tar -xzf "$RUNNER_TEMP/nullwave-fm1-screens-$VERSION.tar.gz" -C assets/screens
+          git switch -c "fm1-$VERSION"
+          git add -A fm1 assets/screens
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "nullwave fm1 $VERSION: installer, emulator, quick start, manual"
+          git push -u origin "fm1-$VERSION"
+          gh pr create --title "nullwave fm1 $VERSION" --body "The FM-1 pages and screens of nullwave fm1 $VERSION."

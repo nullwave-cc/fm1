@@ -1,8 +1,65 @@
 # The manual's screenshots (app/docs/img): ./build.sh --host, then
 #   app/build/host/nullwave_host app/tests/screens.txt app/docs/img
-wait 900
+wait 1800
+# the channels named (SHIFT + SAVE, a ready name, SAVE), their sounds picked: 1 BASS, 2 ARP, 3 LEAD, 4 KEYS, 5 PAD
+turn PRESET 1
+turn PRESET 1
+press OCT-
+wait 30
+tap SAVE
+wait 30
+release OCT-
+turn K3 2
+tap SAVE
+wait 30
+turn ALGO 1
+turn PRESET 1
+press OCT-
+wait 30
+tap SAVE
+wait 30
+release OCT-
+turn K3 7
+tap SAVE
+wait 30
+turn ALGO 1
+turn PRESET 1
+turn PRESET 1
+press OCT-
+wait 30
+tap SAVE
+wait 30
+release OCT-
+turn K3 4
+tap SAVE
+wait 30
+turn ALGO 1
+press OCT-
+wait 30
+tap SAVE
+wait 30
+release OCT-
+turn K3 3
+tap SAVE
+wait 30
+turn ALGO 1
+turn PRESET 1
+turn PRESET 1
+press OCT-
+wait 30
+tap SAVE
+wait 30
+release OCT-
+turn K3 5
+tap SAVE
+wait 30
+turn ALGO 1
+turn ALGO 1
+wait 1400
 shot screen-ready.png
-# a beat on the kit (SEQ held: the steps), a bass line recorded on channel 2, playing
+# a beat on the kit (channel 6; SEQ held: the steps), a bass line recorded on channel 1, playing
+turn ALGO -1
+wait 1400
 press SEQ
 wait 30
 key 0 down 100

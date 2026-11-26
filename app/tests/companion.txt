@@ -3,9 +3,9 @@
 # request followed by the answer it gets. Run by tests/run_tests.sh:
 #   app/build/host/nullwave_host app/tests/companion.txt app/build/host
 wait 300
-# list file 0: one file, "settings" (kind 6 settings, flags 3: read and write), empty, room 3840 bytes
+# list file 0: of thirteen (then the editor's "preset", the songs, user presets, FM6 bank, "factory-reset"), "settings" (kind 6 settings, flags 3: read and write), empty, room 3840 bytes
 sysex F0 00 32 05 1B 00 00 00 00 00 00 7C 07 F7
-expect_sysex F0 00 32 05 4B 01 00 00 00 00 00 00 08 00 40 41 01 00 00 00 00 00 60 03 00 00 66 15 23 47 2E 1A 37 67 66 01 28 07 F7
+expect_sysex F0 00 32 05 4B 01 00 00 00 00 00 00 68 00 40 41 01 00 00 00 00 00 60 03 00 00 66 15 23 47 2E 1A 37 67 66 01 48 06 F7
 sysex_out
 # write it: begin (8 bytes and their CRC-32), the bytes (magic TPL1, octave +2, velocity sensitivity +1), commit
 sysex F0 00 32 05 5B 00 00 40 01 00 00 20 00 00 00 40 63 50 70 14 06 0E F7
@@ -25,7 +25,7 @@ sysex F0 00 32 05 4B 00 00 40 00 00 00 00 00 00 00 00 00 01 7A 03 F7
 expect_sysex F0 00 32 05 03 01 00 40 00 00 00 00 00 00 00 00 00 31 18 41 22 25 20 00 00 00 34 03 F7
 # listed again: 8 bytes
 sysex F0 00 32 05 1B 00 00 00 00 00 00 7C 07 F7
-expect_sysex F0 00 32 05 4B 01 00 00 00 00 00 00 08 00 40 41 01 08 00 00 00 00 60 03 00 00 66 15 23 47 2E 1A 37 67 66 01 68 06 F7
+expect_sysex F0 00 32 05 4B 01 00 00 00 00 00 00 68 00 40 41 01 08 00 00 00 00 60 03 00 00 66 15 23 47 2E 1A 37 67 66 01 08 06 F7
 # deleting it: not allowed (no flag 2), the settings stay
 sysex F0 00 32 05 1B 00 00 00 03 00 00 64 07 F7
 expect_sysex F0 00 32 05 23 00 00 00 03 03 00 00 30 0F F7
