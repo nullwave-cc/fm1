@@ -13,8 +13,8 @@ published.
 
 ## Approvals, in order
 
-1. [ ] **Commit** the work on `device-build`, signed, from the Mac.
-2. [ ] **Merge** it into the default branch, or open the pull request for it.
+1. [ ] **Commit** the work on `main`, signed, from the Mac.
+2. [ ] **Push** main.
 3. [ ] **Tag** `v0.1.0`, signed, on that commit.
 4. [ ] **Push** the branch and the tag. The tag runs `release.yml`, which makes a draft release.
 5. [ ] **GitHub release notes**: review the draft. It has the CHANGELOG entry and the three files. Then publish it.
