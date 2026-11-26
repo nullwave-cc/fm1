@@ -1,0 +1,175 @@
+# The graph view: SHIFT (OCT- or OCT+ held) + a page's own button. One screenshot a graph (app/docs/img with
+#   app/build/host/nullwave_host app/tests/graphs.txt app/docs/img)
+wait 900
+turn ALGO 1
+expect channel 1
+# GRAPHS, the default (SETTINGS, SCREEN): on, then off again
+press OCT-
+tap GLO
+release OCT-
+wait 30
+turn K3 1
+tap ENV
+wait 30
+expect graph 1
+press OCT-
+tap GLO
+release OCT-
+turn K3 -1
+tap ENV
+wait 30
+expect graph 0
+# ENV: the ADSR, the voice's place on it
+press OCT-
+tap ENV
+release OCT-
+wait 30
+expect graph 1
+turn K1 30
+turn K2 40
+turn K3 -40
+key 0 down 100
+wait 120
+shot graph-env.png
+key 0 up
+wait 300
+# ENV DEST: the envelope on each destination
+tap ENV
+press OCT+
+tap ENV
+release OCT+
+wait 30
+expect graph 2
+turn K1 40
+turn K2 -25
+turn K3 20
+wait 30
+shot graph-envdest.png
+# LFO: a cycle, its phase and fade; the dot moving while a note holds
+press OCT-
+tap LFO
+release OCT-
+wait 30
+expect graph 3
+tap LFO
+tap LFO
+turn K1 30
+tap LFO
+turn K1 20
+turn K2 1
+turn K4 40
+key 4 down 100
+wait 400
+shot graph-lfo.png
+key 4 up
+wait 300
+# FILTER: the channel's filter (a low-pass, resonant)
+press OCT-
+tap FX
+release OCT-
+wait 30
+expect graph 4
+turn K2 1
+turn K3 -50
+turn K4 90
+wait 30
+shot graph-filter.png
+# SLICER: its pattern on 16 steps, the step playing lit
+tap FX
+press OCT-
+tap FX
+release OCT-
+wait 30
+expect graph 8
+turn K1 1
+turn K2 4
+turn K4 100
+tap PLAY
+wait 600
+shot graph-slicer.png
+tap PLAY
+wait 50
+# INSERT: the drive's transfer curve
+tap FX
+press OCT-
+tap FX
+release OCT-
+wait 30
+expect graph 11
+turn K1 3
+turn K2 40
+tap FX
+turn K1 127
+wait 30
+shot graph-insert.png
+# DELAY: the echoes fading by the feedback
+tap FX
+press OCT-
+tap FX
+release OCT-
+wait 30
+expect graph 7
+wait 30
+shot graph-delay.png
+# EDIT: a scope of the channel, the engine's own filter
+press OCT-
+tap EDIT
+release OCT-
+wait 30
+expect graph 6
+key 0 down 100
+wait 300
+shot graph-scope.png
+key 0 up
+wait 300
+tap EDIT
+tap EDIT
+press OCT-
+tap EDIT
+release OCT-
+wait 30
+expect graph 5
+shot graph-afilter.png
+# ARP: the notes' order over the octaves
+press OCT-
+tap ARP
+release OCT-
+wait 30
+expect graph 9
+turn K1 3
+turn K3 2
+wait 30
+shot graph-arp.png
+# SEL: the scale on a keyboard
+press OCT-
+tap SEL
+release OCT-
+wait 30
+expect graph 10
+turn K2 2
+wait 30
+shot graph-scale.png
+# again: off, remembered for the page
+press OCT-
+tap SEL
+release OCT-
+wait 30
+expect graph 0
+tap HOME
+tap SEL
+wait 30
+expect graph 0
+tap ENV
+wait 30
+expect graph 1
+# the light theme
+press OCT-
+tap GLO
+release OCT-
+tap GLO
+turn K1 1
+tap ENV
+key 0 down 100
+wait 120
+shot graph-env-light.png
+key 0 up

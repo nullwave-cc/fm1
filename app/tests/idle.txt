@@ -1,0 +1,14 @@
+# Standing by: nothing playing, the render does nothing (every block found silent at once), and after a note it
+# comes back to that once the sound and the effects' tails are gone
+wait 3000
+expect quiet >0
+wait 1000
+expect quiet >99
+midi 91 3C 64
+wait 300
+expect quiet <50
+midi 81 3C 00
+wait 4000
+expect quiet >0
+wait 1000
+expect quiet >99

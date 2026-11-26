@@ -16,7 +16,7 @@ sampler or a MIDI output, and all six share one pool of voices, so there is no f
 
 - Six channels, each with its own sequencer (patterns of 1 to 8 bars, its own length, time signature and step
   size), mix strip, sidechain and MIDI channel. Patterns chain into songs.
-- Engines: Felucca's ANALOG, LOFI, TRIO, WHEEL, NOISE and PHASE, plus FM, sample and slice, drum, wavetable,
+- Engines: ANALOG, LOFI, TRIO, WHEEL, NOISE and PHASE (Felucca-Engines), plus FM, sample and slice, drum, wavetable,
   formant voice, granular and physical models.
 - Shared tape delay and reverb, drive, fold and bitcrush per channel, a master compressor and limiter.
 - Scales on the keys: every key glows faintly, scale keys brighter, roots lit.

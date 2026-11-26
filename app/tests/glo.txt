@@ -1,0 +1,100 @@
+# GLO, with the panel's timing (each edge bouncing for a few ms): a tap opens GLOBAL, each further tap the next page
+# (MASTER, TEXTURE, TEXTURE 2, DRUMS) and round; a hold the mix layer, let go it closes; held + HOME
+# keeps it, GLO again closes it; SHIFT + GLO the SETTINGS screen
+wait 900
+press GLO
+wait 2
+release GLO
+wait 2
+press GLO
+wait 90
+release GLO
+wait 2
+press GLO
+wait 2
+release GLO
+wait 120
+expect page 12
+expect layer -1
+tap GLO
+wait 80
+expect page 20
+tap GLO
+wait 80
+expect page 47
+tap GLO
+wait 80
+expect page 48
+tap GLO
+wait 80
+expect page 22
+tap GLO
+wait 80
+expect page 12
+tap HOME
+wait 80
+# a normal tap, 150 ms down: still a tap, not the layer
+press GLO
+wait 150
+release GLO
+wait 80
+expect page 12
+expect layer -1
+expect mute 0
+tap HOME
+wait 80
+# held: the layer; F4 mutes channel 1, G#4 solos channel 2, D4 LEARN, E4 the fill while held
+press GLO
+wait 500
+expect layer 5
+key 12 down 100
+wait 20
+key 12 up
+wait 20
+expect mute 1
+key 15 down 100
+wait 20
+key 15 up
+wait 20
+expect solo 2
+key 12 down 100
+wait 20
+key 12 up
+key 15 down 100
+wait 20
+key 15 up
+wait 20
+expect mute 0
+expect solo 0
+key 11 down 100
+wait 50
+expect fill 1
+key 11 up
+wait 50
+expect fill 0
+release GLO
+wait 80
+expect layer -1
+expect page 0
+# held + HOME: kept open; GLO again closes it (and opens no page)
+press GLO
+wait 400
+tap HOME
+wait 30
+release GLO
+wait 80
+expect layer 5
+tap GLO
+wait 80
+expect layer -1
+expect page 0
+# SHIFT + GLO: SETTINGS
+press OCT-
+wait 40
+tap GLO
+wait 40
+release OCT-
+wait 80
+expect list 1
+expect page 28
+expect octave 0

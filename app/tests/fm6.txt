@@ -1,0 +1,187 @@
+# FM6 chords: every factory patch F1-F8 with 8 notes at once (6 sound, the oldest taken): no clipping, no overrun
+wait 900
+midi C2 00
+wait 50
+peakreset
+midi 92 30 7F
+midi 92 37 7F
+midi 92 3C 7F
+midi 92 40 7F
+midi 92 43 7F
+midi 92 47 7F
+midi 92 48 7F
+midi 92 4C 7F
+wait 900
+midi 82 30 00
+midi 82 37 00
+midi 82 3C 00
+midi 82 40 00
+midi 82 43 00
+midi 82 47 00
+midi 82 48 00
+midi 82 4C 00
+wait 200
+expect peak_db_max -1
+wait 2500
+midi C2 01
+wait 50
+peakreset
+midi 92 30 7F
+midi 92 37 7F
+midi 92 3C 7F
+midi 92 40 7F
+midi 92 43 7F
+midi 92 47 7F
+midi 92 48 7F
+midi 92 4C 7F
+wait 900
+midi 82 30 00
+midi 82 37 00
+midi 82 3C 00
+midi 82 40 00
+midi 82 43 00
+midi 82 47 00
+midi 82 48 00
+midi 82 4C 00
+wait 200
+expect peak_db_max -1
+wait 2500
+midi C2 02
+wait 50
+peakreset
+midi 92 30 7F
+midi 92 37 7F
+midi 92 3C 7F
+midi 92 40 7F
+midi 92 43 7F
+midi 92 47 7F
+midi 92 48 7F
+midi 92 4C 7F
+wait 900
+midi 82 30 00
+midi 82 37 00
+midi 82 3C 00
+midi 82 40 00
+midi 82 43 00
+midi 82 47 00
+midi 82 48 00
+midi 82 4C 00
+wait 200
+expect peak_db_max -1
+wait 2500
+midi C2 03
+wait 50
+peakreset
+midi 92 30 7F
+midi 92 37 7F
+midi 92 3C 7F
+midi 92 40 7F
+midi 92 43 7F
+midi 92 47 7F
+midi 92 48 7F
+midi 92 4C 7F
+wait 900
+midi 82 30 00
+midi 82 37 00
+midi 82 3C 00
+midi 82 40 00
+midi 82 43 00
+midi 82 47 00
+midi 82 48 00
+midi 82 4C 00
+wait 200
+expect peak_db_max -1
+wait 2500
+midi C2 04
+wait 50
+peakreset
+midi 92 30 7F
+midi 92 37 7F
+midi 92 3C 7F
+midi 92 40 7F
+midi 92 43 7F
+midi 92 47 7F
+midi 92 48 7F
+midi 92 4C 7F
+wait 900
+midi 82 30 00
+midi 82 37 00
+midi 82 3C 00
+midi 82 40 00
+midi 82 43 00
+midi 82 47 00
+midi 82 48 00
+midi 82 4C 00
+wait 200
+expect peak_db_max -1
+wait 2500
+midi C2 05
+wait 50
+peakreset
+midi 92 30 7F
+midi 92 37 7F
+midi 92 3C 7F
+midi 92 40 7F
+midi 92 43 7F
+midi 92 47 7F
+midi 92 48 7F
+midi 92 4C 7F
+wait 900
+midi 82 30 00
+midi 82 37 00
+midi 82 3C 00
+midi 82 40 00
+midi 82 43 00
+midi 82 47 00
+midi 82 48 00
+midi 82 4C 00
+wait 200
+expect peak_db_max -1
+wait 2500
+midi C2 06
+wait 50
+peakreset
+midi 92 30 7F
+midi 92 37 7F
+midi 92 3C 7F
+midi 92 40 7F
+midi 92 43 7F
+midi 92 47 7F
+midi 92 48 7F
+midi 92 4C 7F
+wait 900
+midi 82 30 00
+midi 82 37 00
+midi 82 3C 00
+midi 82 40 00
+midi 82 43 00
+midi 82 47 00
+midi 82 48 00
+midi 82 4C 00
+wait 200
+expect peak_db_max -1
+wait 2500
+midi C2 07
+wait 50
+peakreset
+midi 92 30 7F
+midi 92 37 7F
+midi 92 3C 7F
+midi 92 40 7F
+midi 92 43 7F
+midi 92 47 7F
+midi 92 48 7F
+midi 92 4C 7F
+wait 900
+midi 82 30 00
+midi 82 37 00
+midi 82 3C 00
+midi 82 40 00
+midi 82 43 00
+midi 82 47 00
+midi 82 48 00
+midi 82 4C 00
+wait 200
+expect peak_db_max -1
+wait 2500
+expect overloads 0

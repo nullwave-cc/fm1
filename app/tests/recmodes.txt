@@ -1,0 +1,122 @@
+# Recording: clear (EDIT + REC at once, REC held 2 s), undone with EDIT + OCT-; REC MODE OVERDUB / REPLACE (SHIFT + REC,
+# SETTINGS > SEQ); the SEQ layer's bar (SELECT); HOME's light on MAIN
+wait 900
+expect home_lit 1
+tap ENV
+wait 50
+expect home_lit 0
+tap HOME
+wait 50
+expect home_lit 1
+turn ALGO 1
+# a take on channel 2 (stopped: armed, the first note starts it), REC again to stop
+tap REC
+wait 50
+key 7 down 100
+wait 100
+key 7 up
+wait 300
+key 9 down 100
+wait 100
+key 9 up
+wait 1500
+tap REC
+wait 100
+expect events >1
+# EDIT + REC: cleared at once; EDIT + OCT-: back
+press EDIT
+wait 30
+tap REC
+wait 30
+release EDIT
+wait 30
+expect events 0
+press EDIT
+wait 30
+tap OCT-
+wait 30
+release EDIT
+wait 30
+expect events >1
+# REC held 2 s while recording: cleared
+tap REC
+wait 50
+press REC
+wait 2200
+release REC
+wait 50
+expect events 0
+tap PLAY
+wait 50
+press EDIT
+wait 30
+tap OCT-
+wait 30
+release EDIT
+wait 30
+expect events >1
+# SHIFT + REC: REPLACE; a pass recorded with nothing played erases what was there
+expect replace 0
+press OCT-
+wait 30
+tap REC
+wait 30
+release OCT-
+wait 30
+expect replace 1
+expect octave 0
+tap PLAY
+wait 50
+tap REC
+wait 4300
+tap REC
+wait 50
+tap PLAY
+wait 50
+expect events 0
+# SHIFT + REC again: OVERDUB; SETTINGS > SEQ shows it on KNOB 4
+press OCT-
+wait 30
+tap REC
+wait 30
+release OCT-
+wait 30
+expect replace 0
+press HOME
+wait 800
+release HOME
+wait 50
+tap HOME
+tap HOME
+tap HOME
+wait 30
+expect page 53
+turn K4 1
+wait 30
+expect replace 1
+turn K4 -1
+expect replace 0
+press HOME
+wait 800
+release HOME
+wait 50
+# the SEQ layer's bar: a 3-bar pattern, SELECT to bar 3, a step set there; stopped, SEQ again keeps bar 3
+press SEQ
+wait 30
+turn K4 2
+wait 30
+turn SELECT 2
+wait 30
+expect step_page 2
+key 0 down 100
+wait 30
+key 0 up
+wait 30
+release SEQ
+wait 50
+press SEQ
+wait 1500
+expect step_page 2
+shot rec-steps-bar3.png
+release SEQ
+wait 50

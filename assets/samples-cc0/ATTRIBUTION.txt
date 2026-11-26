@@ -1,0 +1,13 @@
+nullwave's built-in samples (SAMPLE, GRAIN, SLICE): source recordings
+Licence: CC0 1.0 Universal (public domain dedication)
+  https://creativecommons.org/publicdomain/zero/1.0/
+Sources: Versilian Studios (Sam Gossner)
+  VSCO-2 Community Edition  https://github.com/sgossner/VSCO-2-CE  (CC0-1.0)
+  VCSL                      https://github.com/sgossner/VCSL       (CC0-1.0)
+
+PIANO C3, C4, C5  <-  VCSL: Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_C3..C5_v2_rr1_Player.wav
+FLUTE C4, C5      <-  VSCO-2-CE: Woodwinds/Flute/susvib/LDFlute_susvib_C4_v1_1.wav, ..._C5_v1_1.wav
+SAX A#2, A#3      <-  VCSL: Aerophones/Reed Aerophones/Tenor Saxophone/Non-Vibrato/BrettTenor_NV_Main_A#2.., A#3_vl2_rr1.wav
+
+tools/gen_samples.py makes app/samples.h from them: mono, trimmed, 16 kHz, 8-bit mu-law. The recordings themselves are
+not kept in this repository (fetch them from the sources above to run it again). BREAK is synthesised by the script.

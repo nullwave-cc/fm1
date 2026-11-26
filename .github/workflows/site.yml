@@ -63,6 +63,7 @@ jobs:
           # the installer lives at /fm1/installer
           mv _site/install _site/installer
           sed -i 's#"install/"#"installer/"#g' _site/index.html
+          python3 tools/brand.py _site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

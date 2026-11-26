@@ -1,0 +1,44 @@
+# The SETTINGS screen: HOME held or SHIFT + GLO; the groups SCREEN, LIGHTS, AUDIO, SEQ, SYSTEM, MIDI, KEYS, BLUETOOTH; KNOB 1-4 the rows, SELECT the pages, HOME tapped the next group, HOME held out
+wait 900
+press HOME
+wait 800
+release HOME
+expect list 1
+expect page 28
+turn K1 1
+wait 30
+shot settings-screen-light.png
+turn K1 -1
+tap HOME
+tap HOME
+tap HOME
+tap HOME
+tap HOME
+wait 30
+expect page 13
+shot settings-midi.png
+turn SELECT 1
+wait 30
+expect page 23
+tap HOME
+wait 30
+expect page 24
+shot settings-keys.png
+press HOME
+wait 800
+release HOME
+expect list 0
+press OCT-
+wait 30
+tap GLO
+wait 30
+release OCT-
+expect list 1
+expect page 28
+press HOME
+wait 800
+release HOME
+tap GLO
+wait 30
+expect page 12
+expect list 0

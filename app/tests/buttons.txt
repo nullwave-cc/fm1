@@ -1,0 +1,124 @@
+# The buttons: a press that chatters on both edges (a contact bouncing for a few ms) is one press; a tap acts once,
+# on release; a hold acts once when its time comes and its release does nothing; PLAY acts once, on press
+wait 900
+# HOME tapped on MAIN, chattering: the visualiser one step (BARS), not two
+press HOME
+wait 2
+release HOME
+wait 3
+press HOME
+wait 2
+release HOME
+wait 2
+press HOME
+wait 60
+release HOME
+wait 2
+press HOME
+wait 3
+release HOME
+wait 100
+expect vis 1
+expect list 0
+tap HOME
+wait 50
+tap HOME
+wait 50
+tap HOME
+wait 50
+expect vis 0
+# HOME held, chattering at both ends: SETTINGS opens once, its release does nothing
+press HOME
+wait 3
+release HOME
+wait 2
+press HOME
+wait 900
+expect list 1
+release HOME
+wait 2
+press HOME
+wait 2
+release HOME
+wait 100
+expect list 1
+expect page 28
+# a tap in SETTINGS, chattering: the next group, one step
+press HOME
+wait 2
+release HOME
+wait 2
+press HOME
+wait 60
+release HOME
+wait 3
+press HOME
+wait 2
+release HOME
+wait 100
+expect list 1
+expect page 29
+press HOME
+wait 900
+release HOME
+wait 50
+expect list 0
+# ENV tapped, chattering: its first page, not its second
+press ENV
+wait 2
+release ENV
+wait 2
+press ENV
+wait 60
+release ENV
+wait 2
+press ENV
+wait 2
+release ENV
+wait 100
+expect page 1
+tap HOME
+wait 50
+# GLO tapped (a button with a layer): its pages once, the layer never seen
+press GLO
+wait 2
+release GLO
+wait 2
+press GLO
+wait 60
+release GLO
+wait 100
+expect page 12
+expect layer -1
+tap HOME
+wait 50
+# PLAY, chattering: playing once (not started and stopped)
+press PLAY
+wait 2
+release PLAY
+wait 2
+press PLAY
+wait 60
+release PLAY
+wait 2
+press PLAY
+wait 2
+release PLAY
+wait 200
+expect playing 1
+tap PLAY
+wait 50
+expect playing 0
+# REC held 2 s clears; a tap does not (and a chattering tap arms once)
+press REC
+wait 2
+release REC
+wait 2
+press REC
+wait 60
+release REC
+wait 100
+expect rec 1
+tap REC
+wait 50
+expect rec 0

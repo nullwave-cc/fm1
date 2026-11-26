@@ -34,7 +34,7 @@ Connect the FM-1 by USB and switch it on. Then:
     python3 base/tools/fm1_install.py app/build/nullwave.fwsc
 
 The installer finds the FM-1, shows what it will write and asks before writing. It works from M-VAVE's stock
-firmware and from any firmware built on fm1-base or Felucca. The FM-1 restarts into nullwave when it's done.
+firmware and from any firmware built on fm1-base or felucca-bsp. The FM-1 restarts into nullwave when it's done.
 
 If the FM-1 runs M-VAVE's "Open" firmware, put the stock firmware back first: the installer says so.
 

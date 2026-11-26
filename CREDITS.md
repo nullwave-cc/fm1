@@ -9,5 +9,4 @@ nullwave is built on:
 | [Felucca-Engines](https://github.com/hugelton/Felucca-Engines) by Leo Kuroshita, Hügelton Instruments | MIT | The ANALOG, LOFI, TRIO, WHEEL, NOISE and PHASE engines |
 | [JieLi AC79 SDK](https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK) | Apache-2.0 | The files the build takes from it, as fm1-base describes |
 
-[Felucca](https://github.com/hugelton/Felucca) and [SLOOP](https://github.com/isod89/sloop-fm1) were studied for
-ideas. No code from either is used.
+No code from GPL-licensed firmware is used.

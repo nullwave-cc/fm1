@@ -1,0 +1,288 @@
+# The six channels and their sounds (synth.c, eng_kit.c): ./build.sh --host, then
+#   app/build/host/nullwave_host app/tests/engines.txt app/build/host
+wait 600
+# The engines in their order (ANALOG 0, FM6 1, PHASE 2, LOFI 3, SAMPLE 4, VOICE 5, TRIO 6, WHEEL 7, GRAIN 8,
+# PHYS 9, NOISE 10, SLICE 11, DRUM 12): channel 1 a DRUM kit, then ANALOG, FM6, SAMPLE, WHEEL, PHASE; ALGORITHM picks
+# the channel
+expect channel 0
+expect engine 12
+turn ALGO 1
+expect engine 0
+turn ALGO 1
+expect engine 1
+turn ALGO 1
+expect engine 4
+turn ALGO 1
+expect engine 7
+turn ALGO 1
+expect engine 2
+turn ALGO 1
+expect channel 0
+# MIDI channel n plays channel n, whatever is selected: every channel sounds
+peakreset
+midi 91 3C 64
+wait 300
+expect voices2 1
+expect peak_db_min -40
+midi 81 3C 00
+wait 1500
+peakreset
+midi 92 3C 64
+wait 300
+expect peak_db_min -40
+midi 82 3C 00
+wait 1500
+peakreset
+midi 93 3C 64
+wait 300
+expect peak_db_min -40
+midi 83 3C 00
+wait 1500
+peakreset
+midi 94 3C 64
+wait 300
+expect peak_db_min -40
+midi 84 3C 00
+wait 1500
+peakreset
+midi 95 3C 64
+wait 300
+expect peak_db_min -40
+midi 85 3C 00
+wait 1500
+# the kit: its eight lanes on the white keys, twice over
+peakreset
+key 0 down 100
+wait 120
+expect peak_db_min -50
+key 0 up
+wait 400
+peakreset
+key 2 down 100
+wait 120
+expect peak_db_min -50
+key 2 up
+wait 400
+peakreset
+key 4 down 100
+wait 120
+expect peak_db_min -50
+key 4 up
+wait 400
+peakreset
+key 6 down 100
+wait 120
+expect peak_db_min -50
+key 6 up
+wait 400
+peakreset
+key 7 down 100
+wait 120
+expect peak_db_min -50
+key 7 up
+wait 400
+peakreset
+key 9 down 100
+wait 120
+expect peak_db_min -50
+key 9 up
+wait 400
+peakreset
+key 11 down 100
+wait 120
+expect peak_db_min -50
+key 11 up
+wait 400
+peakreset
+key 12 down 100
+wait 120
+expect peak_db_min -50
+key 12 up
+wait 400
+peakreset
+key 14 down 100
+wait 120
+expect peak_db_min -50
+key 14 up
+wait 400
+peakreset
+key 16 down 100
+wait 120
+expect peak_db_min -50
+key 16 up
+wait 400
+peakreset
+key 18 down 100
+wait 120
+expect peak_db_min -50
+key 18 up
+wait 400
+peakreset
+key 19 down 100
+wait 120
+expect peak_db_min -50
+key 19 up
+wait 400
+peakreset
+key 21 down 100
+wait 120
+expect peak_db_min -50
+key 21 up
+wait 400
+peakreset
+key 23 down 100
+wait 120
+expect peak_db_min -50
+key 23 up
+wait 400
+peakreset
+key 24 down 100
+wait 120
+expect peak_db_min -50
+key 24 up
+wait 400
+peakreset
+key 26 down 100
+wait 120
+expect peak_db_min -50
+key 26 up
+wait 400
+# a hit plays out: no note-off ends it
+wait 4000
+midi 90 24 64
+midi 80 24 00
+wait 20
+expect voices1 1
+wait 3000
+expect voices1 0
+# PRESETS: every engine's sounds in one list, engine by engine, the DRUM kits last
+turn ALGO 1
+turn PRESET -1
+expect engine 12
+turn PRESET 1
+expect engine 0
+expect preset 0
+# chords: several voices on one channel (SOFT PAD plays poly; SAW LEAD, the first, is mono)
+turn PRESET 1
+midi 91 3C 64
+midi 91 40 64
+midi 91 43 64
+wait 10
+expect voices 3
+midi 81 3C 00
+midi 81 40 00
+midi 81 43 00
+wait 1500
+expect voices 0
+# GLO held: F4-D5 mute channels 1-6, the black keys F#4-F#5 solo them (G#4: channel 2); the synth honours them
+wait 3000
+press GLO
+wait 30
+key 14 down 100
+wait 20
+key 14 up
+wait 20
+release GLO
+expect mute 2
+expect audible 0
+peakreset
+midi 91 3C 64
+wait 300
+expect peak_db_max -90
+midi 81 3C 00
+wait 4000
+press GLO
+wait 30
+key 14 down 100
+wait 20
+key 14 up
+key 15 down 100
+wait 20
+key 15 up
+wait 20
+release GLO
+expect mute 0
+expect solo 2
+peakreset
+midi 92 3C 64
+wait 300
+expect peak_db_max -90
+midi 82 3C 00
+wait 1500
+peakreset
+midi 91 3C 64
+wait 300
+expect peak_db_min -40
+midi 81 3C 00
+wait 1500
+press GLO
+wait 30
+key 15 down 100
+wait 20
+key 15 up
+release GLO
+wait 30
+expect solo 0
+# the SETTINGS screen (SHIFT + GLO), the KEYS group (the seventh): velocity sensitivity, key learning, a fixed
+# velocity, pressure
+press OCT-
+wait 30
+tap GLO
+wait 30
+release OCT-
+tap HOME
+tap HOME
+tap HOME
+tap HOME
+tap HOME
+tap HOME
+wait 30
+expect page 24
+turn K1 3
+expect vsens 3
+turn K1 9
+expect vsens 5
+turn K2 -1
+expect key_learn 0
+turn K2 1
+expect key_learn 1
+turn K3 10
+expect fixed_vel 40
+expect prs_mode 3
+turn K4 -2
+expect prs_mode 1
+tap HOME
+wait 3500
+reboot
+wait 600
+expect vsens 5
+expect key_learn 1
+expect fixed_vel 40
+expect prs_mode 1
+# the display: HOME held, SETTINGS, SCREEN (the first); THEME light, kept
+press HOME
+wait 800
+release HOME
+expect list 1
+wait 30
+turn K1 1
+expect display 1
+press HOME
+wait 800
+release HOME
+expect list 0
+wait 3500
+reboot
+wait 600
+expect display 1
+# GLO tapped: the song's pages; GLOBAL's TUNE, kept
+tap GLO
+wait 30
+expect page 12
+turn K4 5
+expect tune 5
+tap HOME
+wait 3500
+reboot
+wait 600
+expect tune 5

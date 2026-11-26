@@ -1,0 +1,85 @@
+# MIDI in: the CC map, the sustain pedal, program changes, MIDI LEARN (channel 2 on MIDI channel 2)
+wait 900
+turn ALGO 1
+expect channel 1
+# CC 74: the cutoff, across its range
+midi B1 4A 00
+wait 30
+expect cut 0
+midi B1 4A 7F
+wait 30
+expect cut 127
+# the sustain pedal: a note let go while it is down ends when it comes up
+midi 91 3C 64
+wait 30
+midi B1 40 7F
+midi 81 3C 00
+wait 50
+expect note 60
+midi B1 40 00
+wait 50
+expect note -1
+# a program change: the engine's preset
+midi C1 02
+wait 30
+expect preset 2
+# MIDI LEARN: GLO held, D4; a knob turned, then a CC sent
+press GLO
+wait 30
+key 9 down 100
+wait 20
+key 9 up
+release GLO
+tap ENV
+turn K1 1
+midi B1 10 40
+wait 30
+expect learn_cc0 16
+midi B1 10 7F
+wait 30
+expect atk 127
+midi B1 10 00
+wait 30
+expect atk 0
+# WHITE keys: C4 plays ROOT, the white keys walk the scale from it (MAJOR, root C)
+tap SEL
+turn K2 1
+turn K3 2
+tap HOME
+key 7 down 100
+wait 30
+expect note 60
+key 7 up
+key 9 down 100
+wait 30
+expect note 62
+key 9 up
+key 0 down 100
+wait 30
+expect note 53
+key 0 up
+# a DRUM channel's keys: GM notes, C4 the kick (36), D4 the snare (38), F#4 the closed hat (42),
+# F3 the low floor tom (41, as F4); the octave leaves them alone
+turn ALGO -1
+expect channel 0
+key 7 down 100
+wait 30
+expect note 36
+key 7 up
+key 9 down 100
+wait 30
+expect note 38
+key 9 up
+key 13 down 100
+wait 30
+expect note 42
+key 13 up
+key 0 down 100
+wait 30
+expect note 41
+key 0 up
+tap OCT+
+key 7 down 100
+wait 30
+expect note 36
+key 7 up

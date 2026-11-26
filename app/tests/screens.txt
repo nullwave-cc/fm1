@@ -2,15 +2,70 @@
 #   app/build/host/nullwave_host app/tests/screens.txt app/docs/img
 wait 900
 shot screen-ready.png
-key 7 down 90 50
-press FX
-turn K3 3
-wait 1400
-shot screen-playing.png
-release FX
+# a beat on the kit (SEQ held: the steps), a bass line recorded on channel 2, playing
+press SEQ
+wait 30
+key 0 down 100
+wait 20
+key 0 up
+key 7 down 100
+wait 20
 key 7 up
-tap OCT+
+key 14 down 100
+wait 20
+key 14 up
+key 21 down 100
+wait 20
+key 21 up
+key 2 down 100
+wait 20
+key 2 up
+key 16 down 100
+wait 20
+key 16 up
+wait 400
+shot screen-steps.png
+release SEQ
 wait 30
-turn PRESET 1
+turn ALGO 1
+tap REC
+key 0 down 100
+wait 200
+key 0 up
+wait 300
+key 4 down 100
+wait 200
+key 4 up
+wait 300
+key 7 down 100
+wait 200
+key 7 up
+wait 600
+shot screen-playing.png
+tap REC
+wait 200
+press GLO
+wait 500
+shot screen-mix.png
+release GLO
+press SAVE
+wait 500
+shot screen-scenes.png
+release SAVE
+press OCT-
 wait 30
+tap GLO
+wait 30
+release OCT-
+wait 600
 shot screen-settings.png
+press HOME
+wait 800
+release HOME
+wait 50
+tap FX
+wait 30
+tap FX
+wait 1500
+shot screen-filter.png
+tap PLAY

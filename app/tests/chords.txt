@@ -1,0 +1,874 @@
+# Chords on every engine (its first sound, on channel 2): 2, 4, 6 and 8 notes at once, more than the engine's voices,
+# all sound: a voice taken for a new note plays it (PHYS and SAMPLE once played the old note's end: silence)
+wait 900
+turn ALGO 1
+tap SAVE
+turn SELECT -2
+wait 30
+wait 300
+tap HOME
+wait 50
+peakreset
+midi 91 30 64
+midi 91 33 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+midi 91 42 64
+midi 91 45 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+midi 81 42 00
+midi 81 45 00
+wait 1500
+tap SAVE
+turn SELECT -2
+wait 30
+turn K2 1
+wait 300
+tap HOME
+wait 50
+peakreset
+midi 91 30 64
+midi 91 33 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+midi 91 42 64
+midi 91 45 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+midi 81 42 00
+midi 81 45 00
+wait 1500
+tap SAVE
+turn SELECT -2
+wait 30
+turn K2 1
+wait 300
+tap HOME
+wait 50
+peakreset
+midi 91 30 64
+midi 91 33 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+midi 91 42 64
+midi 91 45 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+midi 81 42 00
+midi 81 45 00
+wait 1500
+tap SAVE
+turn SELECT -2
+wait 30
+turn K2 1
+wait 300
+tap HOME
+wait 50
+peakreset
+midi 91 30 64
+midi 91 33 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+midi 91 42 64
+midi 91 45 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+midi 81 42 00
+midi 81 45 00
+wait 1500
+tap SAVE
+turn SELECT -2
+wait 30
+turn K2 1
+wait 300
+tap HOME
+wait 50
+peakreset
+midi 91 30 64
+midi 91 33 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+midi 91 42 64
+midi 91 45 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+midi 81 42 00
+midi 81 45 00
+wait 1500
+tap SAVE
+turn SELECT -2
+wait 30
+turn K2 1
+wait 300
+tap HOME
+wait 50
+peakreset
+midi 91 30 64
+midi 91 33 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+midi 91 42 64
+midi 91 45 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+midi 81 42 00
+midi 81 45 00
+wait 1500
+tap SAVE
+turn SELECT -2
+wait 30
+turn K2 1
+wait 300
+tap HOME
+wait 50
+peakreset
+midi 91 30 64
+midi 91 33 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+midi 91 42 64
+midi 91 45 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+midi 81 42 00
+midi 81 45 00
+wait 1500
+tap SAVE
+turn SELECT -2
+wait 30
+turn K2 1
+wait 300
+tap HOME
+wait 50
+peakreset
+midi 91 30 64
+midi 91 33 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+midi 91 42 64
+midi 91 45 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+midi 81 42 00
+midi 81 45 00
+wait 1500
+tap SAVE
+turn SELECT -2
+wait 30
+turn K2 1
+wait 300
+tap HOME
+wait 50
+peakreset
+midi 91 30 64
+midi 91 33 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+midi 91 42 64
+midi 91 45 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+midi 81 42 00
+midi 81 45 00
+wait 1500
+tap SAVE
+turn SELECT -2
+wait 30
+turn K2 1
+wait 300
+tap HOME
+wait 50
+peakreset
+midi 91 30 64
+midi 91 33 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+midi 91 42 64
+midi 91 45 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+midi 81 42 00
+midi 81 45 00
+wait 1500
+tap SAVE
+turn SELECT -2
+wait 30
+turn K2 1
+wait 300
+tap HOME
+wait 50
+peakreset
+midi 91 30 64
+midi 91 33 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+midi 91 42 64
+midi 91 45 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+midi 81 42 00
+midi 81 45 00
+wait 1500
+tap SAVE
+turn SELECT -2
+wait 30
+turn K2 1
+wait 300
+tap HOME
+wait 50
+peakreset
+midi 91 30 64
+midi 91 33 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+midi 91 42 64
+midi 91 45 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+midi 81 42 00
+midi 81 45 00
+wait 1500
+tap SAVE
+turn SELECT -2
+wait 30
+turn K2 1
+wait 300
+tap HOME
+wait 50
+peakreset
+midi 91 30 64
+midi 91 33 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+wait 1500
+peakreset
+midi 91 30 64
+midi 91 33 64
+midi 91 36 64
+midi 91 39 64
+midi 91 3C 64
+midi 91 3F 64
+midi 91 42 64
+midi 91 45 64
+wait 400
+expect voices >0
+expect peak_db_min -50
+midi 81 30 00
+midi 81 33 00
+midi 81 36 00
+midi 81 39 00
+midi 81 3C 00
+midi 81 3F 00
+midi 81 42 00
+midi 81 45 00
+wait 1500

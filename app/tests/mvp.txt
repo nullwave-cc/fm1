@@ -1,0 +1,343 @@
+# The groovebox (seq.c, ui.c): recording, steps, scenes, songs, the clock. ./build.sh --host, then
+#   app/build/host/nullwave_host app/tests/mvp.txt app/build/host
+wait 900
+# REC armed (channel 1, the kit): the first note starts a 2-bar loop and records; REC again: the loop plays on
+tap REC
+wait 30
+expect rec 1
+key 0 down 100
+wait 40
+key 0 up
+wait 10
+expect playing 1
+expect rec 4
+expect events 1
+wait 950
+key 2 down 100
+wait 40
+key 2 up
+wait 30
+expect events 2
+tap REC
+wait 30
+expect rec 0
+expect playing 1
+peakreset
+wait 4100
+expect peak_db_min -40
+# EDIT + OCT-: undo the pass; EDIT + OCT+: redo
+press EDIT
+wait 30
+tap OCT-
+wait 30
+release EDIT
+wait 30
+expect events 0
+press EDIT
+wait 30
+tap OCT+
+release EDIT
+wait 30
+expect events 2
+expect octave 0
+# REC held two seconds: the pattern cleared
+press REC
+wait 2200
+release REC
+wait 30
+expect events 0
+tap PLAY
+wait 30
+expect playing 0
+# SEQ held: the white keys are the steps; a step tapped again is cleared
+press SEQ
+wait 400
+key 0 down 100
+wait 20
+key 0 up
+key 7 down 100
+wait 20
+key 7 up
+wait 20
+release SEQ
+wait 30
+expect events 2
+press SEQ
+wait 30
+key 0 down 100
+wait 20
+key 0 up
+release SEQ
+wait 30
+expect events 1
+# scenes: SAVE held + a white key launches one (stopped: at once; playing: at the next bar)
+tap SEQ
+wait 30
+tap HOME
+# SAVE held + white key 2: scene 2 (stopped: at once); its own patterns, empty
+press SAVE
+wait 30
+key 2 down 100
+wait 20
+key 2 up
+wait 20
+release SAVE
+wait 30
+expect scene 1
+expect pattern 1
+expect events 0
+# playing: a launch waits for the bar
+tap PLAY
+wait 100
+press SAVE
+wait 30
+key 0 down 100
+wait 20
+key 0 up
+release SAVE
+wait 30
+expect queued 0
+expect scene 1
+wait 2100
+expect queued -1
+expect scene 0
+expect events 1
+# copy scene 1 to scene 3 (F#3 then key 3)
+press SAVE
+wait 30
+key 1 down 100
+wait 20
+key 1 up
+key 4 down 100
+wait 20
+key 4 up
+release SAVE
+wait 30
+tap PLAY
+wait 30
+press SAVE
+wait 30
+key 4 down 100
+wait 20
+key 4 up
+release SAVE
+wait 30
+expect scene 2
+expect events 1
+# song recording: launches become the chain
+press SAVE
+wait 30
+key 0 down 100
+wait 20
+key 0 up
+release SAVE
+press SAVE
+wait 30
+key 5 down 100
+wait 20
+key 5 up
+release SAVE
+wait 30
+tap PLAY
+wait 2000
+press SAVE
+wait 30
+key 2 down 100
+wait 20
+key 2 up
+release SAVE
+wait 4100
+tap PLAY
+wait 30
+expect nchain 2
+# song mode (SAVE held + G#3): the chain plays
+press SAVE
+wait 30
+key 3 down 100
+wait 20
+key 3 up
+release SAVE
+tap PLAY
+wait 100
+expect scene 0
+expect section 0
+wait 4100
+expect section 1
+expect scene 1
+tap PLAY
+# save, a new song, load it back
+tap SAVE
+wait 30
+expect page 16
+tap SAVE
+wait 30
+tap SAVE
+wait 300
+expect slot_used1 1
+expect song_dirty 0
+turn K4 1
+turn K4 1
+wait 30
+expect nchain 0
+turn K2 1
+turn K2 1
+wait 300
+expect nchain 2
+expect events 1
+# a free take: the REC page's MODE FREE, an empty song (SAVE's SONG page: NEW, twice); two notes 1 s apart, REC
+# after 2 s: 1 bar at 120
+tap SAVE
+wait 30
+turn K4 1
+wait 30
+turn K4 1
+wait 30
+tap HOME
+wait 30
+turn ALGO 1
+tap REC
+wait 30
+expect rec 1
+turn K1 -1
+wait 30
+key 7 down 100
+wait 50
+key 7 up
+wait 950
+key 9 down 100
+wait 50
+key 9 up
+expect rec 3
+wait 950
+tap REC
+wait 30
+expect rec 0
+expect playing 1
+expect bars 1
+expect bpm10 >1150
+expect bpm10 <1250
+expect events 2
+tap PLAY
+wait 30
+# count-in: START COUNT; PLAY counts a bar, then records
+tap HOME
+wait 30
+tap REC
+turn K1 1
+turn K3 1
+tap PLAY
+wait 30
+expect rec 2
+wait 1000
+expect playing 0
+wait 1200
+expect rec 4
+expect playing 1
+tap REC
+tap PLAY
+wait 30
+# a held step: ALGORITHM picks a lock, PRESETS its value; K3 a ratchet
+press SEQ
+wait 30
+key 0 down 100
+wait 30
+turn ALGO 1
+turn PRESET 5
+turn K3 2
+wait 30
+key 0 up
+release SEQ
+wait 30
+expect events 3
+# GLO tapped: the song's five pages, round; MIDI clock in (SETTINGS, MIDI 4/4: SYNC USB): START, pulses move it
+tap GLO
+wait 30
+expect page 12
+tap GLO
+wait 30
+expect page 20
+tap GLO
+tap GLO
+tap GLO
+tap GLO
+wait 30
+expect page 12
+tap HOME
+press OCT-
+wait 30
+tap GLO
+wait 30
+release OCT-
+tap HOME
+tap HOME
+tap HOME
+tap HOME
+tap HOME
+turn SELECT 3
+wait 30
+expect page 15
+turn K3 1
+press HOME
+wait 800
+release HOME
+midi FA
+wait 10
+expect playing 1
+midi F8
+wait 20
+midi F8
+wait 20
+midi FC
+wait 10
+expect playing 0
+# LAUNCH NOW (SETTINGS, SEQ): a scene starts at once; SYNC back to INT (SETTINGS, MIDI 4/4)
+press OCT-
+wait 30
+tap GLO
+wait 30
+release OCT-
+tap HOME
+tap HOME
+tap HOME
+wait 30
+expect list 1
+turn K3 2
+press OCT-
+wait 30
+tap GLO
+wait 30
+release OCT-
+tap HOME
+tap HOME
+tap HOME
+tap HOME
+tap HOME
+turn SELECT 3
+wait 30
+turn K3 -1
+press HOME
+wait 800
+release HOME
+wait 30
+tap PLAY
+wait 100
+expect playing 1
+press SAVE
+wait 30
+key 6 down 100
+wait 20
+key 6 up
+release SAVE
+wait 30
+expect scene 3
+tap PLAY
+# the song kept by itself (AUTOSAVE, stopped and quiet 3 s): after a restart, as it was
+wait 3500
+expect song_dirty 0
+reboot
+wait 900
+expect slot 0
+expect scene 0
+expect channel 1
+expect events 3
+expect bars 1
