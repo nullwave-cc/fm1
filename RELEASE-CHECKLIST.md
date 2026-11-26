@@ -26,5 +26,3 @@ published.
 ## Not in the release
 
 - The test builds' installers and packages (0.2-dev, 0.2.1-dev, 0.2.2-dev, 0.3-dev) stay local.
-- `docs/GUIDE.md` is a pointer to the quick start and the manual. Its pictures in `docs/img/guide/` are no longer
-  used and can be deleted (with Adro's OK).
