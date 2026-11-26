@@ -1,41 +1,38 @@
-# Publishing a release to nullwave.cc
+# Publishing the fm1 pages to nullwave.cc
 
-nullwave.cc is the nullwave-cc/site repository. Its FM-1 product page is `fm1/index.html` there. This repository
-makes the rest of `/fm1/`: the installer, the emulator, the quick start and the manual.
+nullwave.cc is the nullwave-cc/site repository. Its FM-1 product page is `fm1/index.html` there, and the site keeps
+the shared pieces: `/style.css`, `/device.js` and `/assets/` (logos, fonts, the FM-1's screens). This repository makes
+four folders of `/fm1/`: the installer, the emulator, the quick start and the manual.
 
-A version tag (`v0.1.0`) runs [release.yml](../.github/workflows/release.yml). It makes a **draft** GitHub release
-with three files:
-
-- `nullwave-0.1.0.fwsc`, the package.
-- `nullwave-fm1-site-0.1.0.tar.gz`, the pages for `fm1/` on the site: `installer/`, `emulator/`, `quick-start/`,
-  `manual/`, `companion/`, `firmware/`, `fonts/`, `words/`, `assets/` and `fm1ports.js`. It has no `index.html`:
-  the site keeps its own product page.
-- `nullwave-fm1-screens-0.1.0.tar.gz`, the screens for the site's `assets/screens/`. These are the 960 × 960 PNG and
-  WebP pictures of [docs/img/promo](img/promo), with the site's file names. The site's FM-1 drawing loads them.
-
-## Copying them into the site
-
-In a checkout of nullwave-cc/site, on a new branch:
+## 1. Build the pages
 
 ```bash
-gh release download v0.1.0 --repo nullwave-cc/fm1 --pattern 'nullwave-fm1-*.tar.gz'
+./build.sh --release VERSION
 ```
+
+Then the site build (the pages at `app/build/site`, in the site's look by tools/site_look.py), and:
 
 ```bash
-tar -xzf nullwave-fm1-site-0.1.0.tar.gz -C fm1
+python3 tools/publish_site.py VERSION OUT
 ```
 
-```bash
-tar -xzf nullwave-fm1-screens-0.1.0.tar.gz -C assets/screens
-```
+`OUT` is a checkout of nullwave-cc/site (or any folder, to look at first). It writes `OUT/fm1/installer/`,
+`OUT/fm1/emulator/`, `OUT/fm1/quick-start/` and `OUT/fm1/manual/`, and nothing else:
 
-Then check the result locally and open a pull request.
+- the pages use the site's `/style.css`, `/device.js` and `/assets/` logos;
+- each folder carries what only it needs: the installer the companion's scripts and the packages it installs, the
+  emulator its fonts and words, the quick start and the manual the docs' script and style;
+- `--fw-url URL` makes the installer load nullwave's package from a release asset instead of its own copy (the
+  host must allow the browser to fetch it: a GitHub release asset does not, so the default is the copy beside it).
 
-- The site's `fm1/index.html` must still be its own. The site archive has none, so it is not touched.
-- The earlier test builds' installers (`installer-0.2-dev` and the like) are never in a release. If an older copy
-  of them is in the site, remove it.
+It prints the screens the pages show. They are the site's `/assets/screens/` (this repository's
+[docs/img/promo](img/promo), by name): copy any that are new or changed there.
 
-## Or by a workflow in the site
+## 2. Into the site
 
-[publish/site-fm1.yml](publish/site-fm1.yml) does the same in nullwave-cc/site. Copy it there as
-`.github/workflows/fm1.yml` and run it by hand with a version. It opens a pull request; it never pushes to `main`.
+On a branch of nullwave-cc/site, commit only those four folders (and the screens, if any changed, as their own
+change), then open a pull request for the site's review. `fm1/index.html`, `style.css`, `device.js` and the rest of
+the site stay as they are.
+
+A version tag (`vX.Y.Z`) also runs [release.yml](../.github/workflows/release.yml): a **draft** GitHub release with
+the package, to be published by hand.
