@@ -10,7 +10,7 @@
 A groovebox firmware for the M-VAVE FM-1, with six equal channels. Any channel can be a synth, a drum kit, a
 sampler or a MIDI output, and all six share one pool of voices, so there is no fixed drum track.
 
-**Version 0.1.0**, the first public release. Install it from the browser at
+**Version 0.1.1**, the current release. Install it from the browser at
 [nullwave.cc/fm1/installer](https://nullwave.cc/fm1/installer/), then follow the
 [quick start](https://nullwave.cc/fm1/quick-start/). The [manual](app/docs/MANUAL.md) is the full reference, and
 [CHANGELOG.md](CHANGELOG.md) lists what is in each version.
