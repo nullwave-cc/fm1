@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.3
+
+- A new fm1 logo on the boot, install and factory-reset screens: the fm1 mark over "nullwave fm1".
+- The installer finds the FM-1 again when it comes back from an update as a new USB device, waits longer for it, and
+  says what to do if it does not answer.
+- The fm1 icons on the installer, emulator, quick start and manual pages.
+
 ## 0.1.2
 
 - Over USB the FM-1 now shows as "FM-1" by nullwave, with a serial number of its own (from its chip), so a computer
