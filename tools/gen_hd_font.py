@@ -3,7 +3,7 @@
 # Copyright (C) 2026 nullwave contributors
 """The screen's faces and its logo at 4x, for the host simulator's HD render (app/hd.c, NW_HD) only: the same Barlow
 TTFs and roles as the device's (fm1-base's tools/gen_font.py, its "barlow" set), drawn at four times the size,
-anti-aliased; and the logo's five shapes from the logotypes svg (as tools/gen_art.py takes them), at 960 x 960.
+anti-aliased; and the logo's shapes (tools/gen_art.py's layout of the fm1 lockup), at 960 x 960.
 
     python3 tools/gen_hd_font.py OUT.h
 
@@ -20,26 +20,21 @@ SCALE = 4
 FULL = ("L", "M", "B", "T")              # (fm1.toml font_full: lower case in these)
 
 
-def logo(k=16):
-    """the splash's five shapes, each an 8-bit coverage mask in its box at 960 x 960"""
-    import re
-    from PIL import Image, ImageChops, ImageDraw
-    s = (ROOT.parent / "logotypes" / "svg" / "nullwave-fm1-splash-dark.svg").read_text()   # (tools/gen_art.py's)
+def logo(k=4):
+    """the splash's shapes (tools/gen_art.py's layout of the fm1 lockup), each an 8-bit coverage mask in its box at
+    960 x 960"""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import gen_art
     out, boxes = [], []
-    for j, m in enumerate(re.finditer(r"<path ([^>]*)>", s)):
-        d = re.search(r'd="([^"]*)"', m.group(1)).group(1)
-        im = Image.new("1", (240 * k, 240 * k), 0)
-        for sp in re.findall(r"M([^MZ]*)Z", d):
-            pts = [tuple(float(v) * k for v in p.split()) for p in sp.split("L")]
-            m1 = Image.new("1", im.size, 0)
-            ImageDraw.Draw(m1).polygon(pts, fill=1)
-            im = ImageChops.logical_xor(im, m1)
-        cov = im.convert("L").resize((960, 960), Image.LANCZOS)
+    shapes = gen_art.splash_shapes()
+    for j, (name, subs) in enumerate(shapes):
+        cov = gen_art.shape_cover(subs, 960, k)
         bx = cov.getbbox()
         data = cov.crop(bx).tobytes()
         out.append(f"static const uint8_t HD_LOGO{j}[{len(data)}] = {{" + ",".join(map(str, data)) + "};")
         boxes.append(f"{{{bx[0]}, {bx[1]}, {bx[2] - bx[0]}, {bx[3] - bx[1]}, HD_LOGO{j}}}")
-    out.append("static const struct { int32_t x, y, w, h; const uint8_t *a; } HD_LOGO[5] = {" + ", ".join(boxes) + "};")
+    out.append(f"static const struct {{ int32_t x, y, w, h; const uint8_t *a; }} HD_LOGO[{len(shapes)}] = {{"
+               + ", ".join(boxes) + "};")
     return out
 
 

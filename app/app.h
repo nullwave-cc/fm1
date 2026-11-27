@@ -13,7 +13,7 @@
 #define APP_BLOCK 256u                   /* frames per audio block: 5.8 ms at 44.1 kHz */
 #define APP_TOUCH                        /* velocity and pressure from the keys (lib/touch.h) */
 #define APP_BATTERY_RAW                  /* plat_battery_charging: the battery shows a bolt while charging */
-#define APP_SPLASH                       /* app_splash: the nullwave logo at boot (art.h) */
+#define APP_SPLASH                       /* app_splash: the fm1 lockup at boot (art.h) */
 #define APP_SYSEX_BYTE                   /* app_sysex_byte: DX7 SysEx for FM6 (a voice, a bank) */
 void app_sysex_byte(uint8_t b);
 #define APP_OVERLOAD                     /* app_overload: the render ran late (the screen says so) */

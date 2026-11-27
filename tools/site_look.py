@@ -748,7 +748,9 @@ def look(f, site, base, backup, version=""):
         css = CSS
     else:
         css = CSS + app_tokens() + APP + PAGE_CSS.get(kind, "")
-    head = ('<!--nw:look-->\n<link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
+    head = ('<!--nw:look-->\n<link rel="icon" href="/fm1/favicon.ico" sizes="any">\n'   # (the fm1 app's icons: the
+            '<link rel="icon" href="/fm1/favicon.svg" type="image/svg+xml">\n'           # site's FM-1 page has them)
+            '<link rel="apple-touch-icon" href="/fm1/apple-touch-icon.png">\n'
             f'<link rel="stylesheet" href="{base}assets/style.css">\n'
             + (f'<link rel="stylesheet" href="{base}assets/fm1-docs.css">\n' if kind in DOCS else "")
             + f"<style>{css}</style>\n<!--/nw:look-->\n")

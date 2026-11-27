@@ -274,22 +274,25 @@ static void draw_battery(int b)
 }
 
 /* -------------------------------------------------------------- the logo --- */
-/* the logotypes repository's FM-1 splash (art.h): the ring, the disc, the slash, "null", "wave"; drawn in the
- * theme's colours (dark: the ring #3A3A3A, the disc and "null" white; light: the ring #C8C8C8, they black; the slash
- * and "wave" red in both), a shape at a time, faded (alpha 0..16), moved (dx), the ring swept in from the top
- * clockwise (sweep 0..4096 of a turn, 4096 all of it) */
-static const struct { int16_t x, y, w, h; const uint8_t *rle; uint16_t n; } LOGO[5] = {
+/* the fm1 app's lockup (art.h, from the logotypes repository's apps/fm1): its mark (the ring, the body: the disc with
+ * its stepped cut, the slash's red ends) over "null" "wave" "fm1"; drawn in the theme's colours as the lockup's dark
+ * and light files have them (dark: the ring #3A3A3A, the body and "null" white, "fm1" #8A8A8A; light: the ring
+ * #C8C8C8, they black, "fm1" #5C5C5C; the ends and "wave" red in both), a shape at a time, faded (alpha 0..16), moved
+ * (dx), the ring swept in from the top clockwise (sweep 0..4096 of a turn, 4096 all of it) */
+#define LOGO_N 6
+static const struct { int16_t x, y, w, h; const uint8_t *rle; uint16_t n; } LOGO[LOGO_N] = {
     {LOGO_RING_X, LOGO_RING_Y, LOGO_RING_W, LOGO_RING_H, LOGO_RING, sizeof LOGO_RING},
-    {LOGO_DISC_X, LOGO_DISC_Y, LOGO_DISC_W, LOGO_DISC_H, LOGO_DISC, sizeof LOGO_DISC},
-    {LOGO_SLASH_X, LOGO_SLASH_Y, LOGO_SLASH_W, LOGO_SLASH_H, LOGO_SLASH, sizeof LOGO_SLASH},
+    {LOGO_BODY_X, LOGO_BODY_Y, LOGO_BODY_W, LOGO_BODY_H, LOGO_BODY, sizeof LOGO_BODY},
+    {LOGO_TAILS_X, LOGO_TAILS_Y, LOGO_TAILS_W, LOGO_TAILS_H, LOGO_TAILS, sizeof LOGO_TAILS},
     {LOGO_NULL_X, LOGO_NULL_Y, LOGO_NULL_W, LOGO_NULL_H, LOGO_NULL, sizeof LOGO_NULL},
     {LOGO_WAVE_X, LOGO_WAVE_Y, LOGO_WAVE_W, LOGO_WAVE_H, LOGO_WAVE, sizeof LOGO_WAVE},
+    {LOGO_FM1_X, LOGO_FM1_Y, LOGO_FM1_W, LOGO_FM1_H, LOGO_FM1, sizeof LOGO_FM1},
 };
 static uint16_t logo_colour(uint32_t part, uint32_t light)
 {
-    static const uint32_t C[2][5] = {{0x3A3A3A, 0xFFFFFF, 0xE5202E, 0xFFFFFF, 0xE5202E},
-                                     {0xC8C8C8, 0x000000, 0xE5202E, 0x000000, 0xE5202E}};
-    return rgb565(C[light & 1u][part % 5u]);
+    static const uint32_t C[2][LOGO_N] = {{0x3A3A3A, 0xFFFFFF, 0xE5202E, 0xFFFFFF, 0xE5202E, 0x8A8A8A},
+                                          {0xC8C8C8, 0x000000, 0xE5202E, 0x000000, 0xE5202E, 0x5C5C5C}};
+    return rgb565(C[light & 1u][part % LOGO_N]);
 }
 static uint32_t turn_of(int32_t dx, int32_t dy)   /* (dx, dy)'s angle from straight up, clockwise, 0..4095 */
 {
@@ -353,9 +356,10 @@ static void logo_part(uint32_t part, uint32_t light, uint32_t alpha, int32_t dx,
 #endif
 }
 
-/* the boot animation at time t (ms from the start): the ring draws itself in from the top, the disc comes up inside
- * it, then the slash, then "null" from the left and the red "wave" from the right, the version under them; the ring
- * is always there before anything else, as the logo's rule asks. Drawn whole (two bands), in the theme */
+/* the boot animation at time t (ms from the start): the ring draws itself in from the top, the body (the disc with its
+ * stepped cut) comes up inside it, then the slash's red ends, then "null" from the left, the red "wave" and "fm1" from
+ * the right, the version under them; the ring is always there before anything else, as the logo's rule asks. Drawn
+ * whole (two bands), in the theme */
 #define LOGO_MS 1300u
 static uint32_t ramp(uint32_t t, uint32_t t0, uint32_t len)   /* 0..16 between t0 and t0 + len */
 {
@@ -369,7 +373,7 @@ static void logo_frame(uint32_t t, uint32_t light)
     uint16_t bg = light ? rgb565(0xFFFFFF) : rgb565(0x000000);
     for (b = 0; b < 2u; b++) {           /* rows 0..143, 144..239 */
         uint32_t h = b ? 96u : 144u, sw = t >= 420u ? 4096u : t * 4096u / 420u;
-        uint32_t an = ramp(t, 700u, 320u), aw = ramp(t, 820u, 320u);
+        uint32_t an = ramp(t, 700u, 320u), aw = ramp(t, 820u, 320u), af = ramp(t, 920u, 300u);
         cv_begin(240, h, bg);
         cv_oy = -(int32_t)(144u * b);
         cv_y0 = 0;
@@ -379,6 +383,7 @@ static void logo_frame(uint32_t t, uint32_t light)
         logo_part(2, light, ramp(t, 520u, 220u), 0, 4096u);
         logo_part(3, light, an, -(int32_t)((16u - an) * 10u / 16u), 4096u);
         logo_part(4, light, aw, (int32_t)((16u - aw) * 10u / 16u), 4096u);
+        logo_part(5, light, af, (int32_t)((16u - af) * 10u / 16u), 4096u);
         if (t >= 1000u) {                /* the version, red as the logo files have it; or the install's words */
             const char *c1 = logo_cap ? logo_cap : fresh_build ? "INSTALLED" : APP_VERSION;
             const char *c2 = logo_cap ? logo_cap2 : fresh_build ? APP_VERSION : 0;
