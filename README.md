@@ -45,6 +45,9 @@ sampler or a MIDI output, and all six share one pool of voices, so there is no f
     ./build.sh                      # the FM-1 package: app/build/nullwave.fwsc
     ./build.sh --web                # the browser emulator
 
+Releases: one command, `python3 tools/release.py VERSION` ([docs/RELEASING.md](docs/RELEASING.md)); try it with
+`--dry-run` first.
+
 ## Install
 
 From the browser: [nullwave.cc/fm1/installer](https://nullwave.cc/fm1/installer/). From a terminal, or to go back to

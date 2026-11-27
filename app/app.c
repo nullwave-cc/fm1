@@ -549,6 +549,511 @@ static void sysex_poll(void)
 #include "ui_draw.c"
 #include "ui.c"
 
+/* the editor's follow (docs/EDITOR-PROTOCOL.md): 0x74 FOCUS from the editor, 0x75 NAV and 0x76 HELLO-FOCUS to it,
+ * in the update's framing (F0 pack7(00 59 cmd len24 body ~sum8(body)) F7), as the companion's services */
+#define ED_FOCUS 0x74u
+#define ED_NAV 0x75u
+#define ED_HELLO 0x76u
+#define ED_MAX 600u                      /* a reply's body at most (the editor's frames from the FM-1) */
+static uint8_t ed_raw[ED_MAX + 8], ed_out[ED_MAX + ED_MAX / 7u + 16u], ed_body[ED_MAX];
+static uint32_t ed_wire(uint32_t n) { return 2u + ((n + 7u) * 8u + 6u) / 7u; }   /* a body's frame: its bytes */
+static int ed_send(uint32_t cmd, const uint8_t *body, uint32_t n)   /* 0 sent (queued whole), -1 not */
+{
+    uint8_t *raw = ed_raw, *out = ed_out;
+    uint32_t i, k = 0, acc = 0, nb = 0, sum = 0;
+    if (n > ED_MAX)
+        return -1;
+    raw[0] = 0;
+    raw[1] = 0x59;
+    raw[2] = (uint8_t)cmd;
+    raw[3] = (uint8_t)n;
+    raw[4] = (uint8_t)(n >> 8);
+    raw[5] = 0;
+    for (i = 0; i < n; i++) {
+        raw[6 + i] = body[i];
+        sum += body[i];
+    }
+    raw[6 + n] = (uint8_t)~sum;
+    out[k++] = 0xF0;
+    for (i = 0; i < n + 7u; i++) {       /* (pack7: eight bits in, seven a byte out, low first) */
+        acc |= (uint32_t)raw[i] << nb;
+        nb += 8;
+        while (nb >= 7u) {
+            out[k++] = (uint8_t)(acc & 0x7Fu);
+            acc >>= 7;
+            nb -= 7;
+        }
+    }
+    if (nb)
+        out[k++] = (uint8_t)(acc & 0x7Fu);
+    out[k++] = 0xF7;
+    return plat_sysex_send(out, k);
+}
+void editor_nav(uint32_t ev, int32_t arg)   /* 0x75 NAV: 1 CH, 2 PAGE, 3 PRESET (arg -1 / +1), 4 SAVE, 5 SCENE n, 6 EXIT */
+{
+    uint8_t b[2] = {(uint8_t)ev, (uint8_t)(int8_t)arg};
+    ed_send(ED_NAV, b, 2);
+}
+void editor_hello(uint32_t reason)       /* 0x76 HELLO-FOCUS: 0 a computer connected, 1 EDITOR opened on the FM-1 */
+{
+    uint8_t b[3] = {1, set.channel, (uint8_t)reason};
+    ed_send(ED_HELLO, b, 3);
+}
+void ui_editor_focus(uint32_t ch, const char *title, uint32_t tlen, const uint16_t *ids, uint32_t n);
+static int ed_more(uint32_t cmd, const uint8_t *q, uint32_t bl);
+static int ed_frame(const uint8_t *d, uint32_t n)   /* a decoded frame (cmd d[2], body d + 6): 1 the editor's */
+{
+    uint32_t bl, tl, k, cnt;
+    uint16_t ids[8];
+    uint8_t st = 0;
+    if (n >= 7u && d[2] >= 0x70u && d[2] <= 0x73u)
+        return ed_more(d[2], d + 6, n - 7u);
+    if (n < 7u || d[2] != ED_FOCUS)
+        return 0;
+    bl = n - 7u;                         /* body: ver, channel, title length, title, count, ids (u16) */
+    tl = bl >= 3u ? d[8] : 0u;
+    cnt = bl >= 4u + tl ? d[9 + tl] : 0u;
+    if (bl < 4u + tl || d[6] != 1u || d[7] >= NCH || tl > 16u || cnt > 8u || bl < 4u + tl + 2u * cnt)
+        st = 1;                          /* (not one this firmware reads: nothing changes) */
+    else {
+        for (k = 0; k < cnt; k++)
+            ids[k] = (uint16_t)(d[10 + tl + 2u * k] | d[11 + tl + 2u * k] << 8);
+        ui_editor_focus(d[7], (const char *)d + 9, tl, ids, cnt);
+    }
+    ed_send(ED_FOCUS, &st, 1);           /* (answered, as every request: 0 taken, 1 not) */
+    return 1;
+}
+void app_usb_cmd(const uint8_t *d, uint32_t n) { ed_frame(d, n); }
+int app_sysex(const uint8_t *p, uint32_t n)   /* (the host's way in; on the FM-1 the frames come by app_usb_cmd) */
+{
+#ifdef PLAT_HOST
+    static uint8_t dec[700];
+    uint32_t i, k = 0, acc = 0, nb = 0, sum = 0, len;
+    for (i = 0; i < n && k < sizeof dec; i++) {
+        acc |= (uint32_t)(p[i] & 0x7Fu) << nb;
+        nb += 7;
+        if (nb >= 8u) {
+            dec[k++] = (uint8_t)acc;
+            acc >>= 8;
+            nb -= 8;
+        }
+    }
+    if (k < 7u || dec[0] != 0 || dec[1] != 0x59u || dec[2] < 0x70u || dec[2] > ED_FOCUS)
+        return 0;
+    len = dec[3] | dec[4] << 8 | (uint32_t)dec[5] << 16;
+    if (len + 7u > k)
+        return 0;
+    for (i = 0; i < len; i++)
+        sum += dec[6 + i];
+    if ((uint8_t)~sum != dec[6 + len])
+        return 0;
+    return ed_frame(dec, len + 7u);
+#else
+    (void)p;
+    (void)n;
+    return 0;
+#endif
+}
+/* the editor's views of the FM-1 (docs/EDITOR-PROTOCOL.md 0x70..0x73): each request a version byte and an op; each
+ * answer the version asked, a status (ED_OK ...) and the op, then its data. Bytes past what a version reads: ignored.
+ * STATE and STEPS speak versions 1 and 2 (2: the patterns' time and step in the channel blocks, the STEPS header);
+ * SONG and PRESETS 1 */
+enum { ED_OK, ED_BAD, ED_BUSY, ED_RANGE };
+#define ED_STATE 0x70u
+#define ED_STEPS 0x71u
+#define ED_SONG 0x72u
+#define ED_PRESETS 0x73u
+#define ED_BEATS 4u                      /* a pattern's time: 4/4 (TBAR), the same for every pattern in this firmware */
+#define ED_UNIT 4u
+static uint8_t ed_ver = 1;               /* the version the request asked: its answer's */
+static uint8_t ed_state_sub, ed_state_ver = 1, ed_steps_sub, ed_steps_ver = 1, ed_steps_ch;
+static int factory_busy(void);
+static void ed_name(uint8_t *o, const char *s, uint32_t n)   /* a name, 0-padded to n */
+{
+    uint32_t i = 0;
+    for (; s && s[i] && i < n; i++)
+        o[i] = (uint8_t)s[i];
+    for (; i < n; i++)
+        o[i] = 0;
+}
+static uint32_t ed_time(uint8_t *b, const pat_t *p)   /* a pattern's DIV, step (ticks, u16), beats, beat unit: 5 bytes */
+{
+    uint32_t st = seq_step_ticks(p);
+    b[0] = p->div;
+    b[1] = (uint8_t)st;
+    b[2] = (uint8_t)(st >> 8);
+    b[3] = ED_BEATS;
+    b[4] = ED_UNIT;
+    return 5;
+}
+static uint32_t ed_state(uint8_t *b, uint32_t ver)   /* 0x70's data from b[3]: version 1 162 bytes in all, 2 186 */
+{
+    uint32_t ch = set.channel, k = 3, i;
+    const pat_t *pp = seq_pat(ch);
+    int32_t pos = seq_pos(ch), bp = batt_pct();
+    uint32_t r = seq_rec();
+    b[k++] = (uint8_t)(seq_playing() | (r == REC_ON || r == REC_TAKE) << 1 | (r == REC_ARMED) << 2 | (r == REC_COUNT) << 3
+                       | (song.mode == MODE_SONG) << 4 | (seq_song_rec_on() != 0) << 5 | (seq_cfg.rec_replace != 0) << 6);
+    b[k++] = (uint8_t)song.bpm10;
+    b[k++] = (uint8_t)(song.bpm10 >> 8);
+    b[k++] = (uint8_t)ch;
+    b[k++] = pp->bars;
+    b[k++] = (uint8_t)(pos >= 0 ? (uint32_t)pos / TBAR : 0xFFu);
+    b[k++] = (uint8_t)(pos >= 0 ? (uint32_t)pos % TBAR / seq_step_ticks(pp) : 0xFFu);
+    b[k++] = (uint8_t)(bp >= 0 ? (uint32_t)bp : 0xFFu);
+    b[k++] = (uint8_t)((plat_battery() == 4 || bp < 0) | (plat_battery_charging() == 2) << 1);
+    b[k++] = (uint8_t)seq_scene();
+    b[k++] = (uint8_t)(seq_queued() >= 0 ? (uint32_t)seq_queued() : 0xFFu);
+    b[k++] = song.nchain;
+    b[k++] = (uint8_t)(song.nchain ? seq_sect() : 0xFFu);
+    b[k++] = (uint8_t)(song.nchain ? song.chain[seq_sect() % NCHAIN].scene : 0xFFu);
+    b[k++] = (uint8_t)r;
+    for (i = 0; i < NCH; i++) {          /* each channel: 24 bytes (version 2: 28) */
+        const sound_t *s = synth_sound(i);
+        b[k++] = s->engine;
+        b[k++] = s->preset;
+        b[k++] = (uint8_t)synth_get_level(i);
+        b[k++] = (uint8_t)((seq_mute() >> i & 1u) | (seq_solo() >> i & 1u) << 1 | (synth_audible(i) != 0) << 2
+                           | (s->arp_hold != 0) << 3 | (seq_drones(i) != 0) << 4);
+        b[k++] = (uint8_t)(seq_pat(i) - &song.pat[i][0]);
+        b[k++] = seq_pat(i)->bars;
+        b[k++] = (uint8_t)synth_voices(i);
+        if (ver >= 2u)
+            k += ed_time(b + k, seq_pat(i));
+        ed_name(b + k, chan_name(i), 16);
+        k += 16;
+        if (ver < 2u)
+            b[k++] = 0;                  /* (version 1: kept for a later field) */
+    }
+    return k;
+}
+static int ed_reply(uint32_t cmd, uint32_t st, uint32_t op, uint32_t n)   /* ed_body[3..n) the data; 0 sent */
+{
+    ed_body[0] = ed_ver;
+    ed_body[1] = (uint8_t)st;
+    ed_body[2] = (uint8_t)op;
+    return ed_send(cmd, ed_body, n < 3u ? 3u : n);
+}
+static uint32_t ed_scene(uint8_t *b, uint32_t s)   /* a scene: pat x6, mute, solo, level x6, has_sound, used (16) */
+{
+    const scene_t *sc = &song.scene[s % NSCENE];
+    uint32_t c, k = 0;
+    for (c = 0; c < NCH; c++)
+        b[k++] = sc->pat[c];
+    b[k++] = sc->mute;
+    b[k++] = sc->solo;
+    for (c = 0; c < NCH; c++)
+        b[k++] = sc->level[c];
+    b[k++] = sc->has_sound;
+    b[k++] = (uint8_t)seq_scene_used(s);
+    return k;
+}
+/* 0x70's ops 2..6: the transport as the FM-1's own buttons and knobs move it; 0 done, else the status */
+static uint32_t ed_transport(uint32_t op, const uint8_t *q, uint32_t bl)
+{
+    uint32_t a = bl >= 3u ? q[2] : 0xFFu, r = seq_rec();
+    if (factory_busy())
+        return ED_BUSY;
+    switch (op) {
+    case 2:                              /* PLAY [1 play, 0 stop] (as PLAY: a count-in or a free take, as there) */
+        if (a > 1u)
+            return ED_BAD;
+        if (a && !seq_playing() && r != REC_COUNT && r != REC_TAKE)
+            seq_play();
+        else if (!a && (seq_playing() || r == REC_COUNT || r == REC_TAKE)) {
+            if (r == REC_COUNT || r == REC_TAKE)
+                seq_play();              /* (the count or the take dropped, as PLAY does there) */
+            seq_stop();
+        }
+        return ED_OK;
+    case 3:                              /* REC [0 the REC button, 1 arm (on), 2 off], on the selected channel */
+        if (a > 2u)
+            return ED_BAD;
+        if (a == 0u || (a == 1u && r == REC_OFF) || (a == 2u && r != REC_OFF))
+            seq_rec_button(set.channel);
+        return ED_OK;
+    case 4: {                            /* TEMPO [bpm x 10, u16]: 40.0 .. 240.0; refused while a clock sets it */
+        uint32_t t = bl >= 4u ? (uint32_t)(q[2] | q[3] << 8) : 0u;
+        if (bl < 4u)
+            return ED_BAD;
+        if (t < 400u || t > 2400u)
+            return ED_RANGE;
+        if (seq_cfg.sync != SYNC_INT)
+            return ED_BUSY;
+        seq_set_bpm10(t);
+        return ED_OK;
+    }
+    case 5:                              /* LAUNCH [scene]: stopped at once, playing at SCENE LAUNCH's (BAR, LOOP, NOW) */
+        if (a >= NSCENE)
+            return bl < 3u ? ED_BAD : ED_RANGE;
+        seq_launch(a);
+        return ED_OK;
+    case 6:                              /* MODE [0 LOOP, 1 SONG] */
+        if (a > 1u)
+            return ED_BAD;
+        seq_mode(a);
+        return ED_OK;
+    default:
+        return ED_BAD;
+    }
+}
+static int ed_more(uint32_t cmd, const uint8_t *q, uint32_t bl)
+{
+    uint32_t op = bl >= 2u ? q[1] : 0xFFu, k = 3, i, maxv = cmd == ED_STATE || cmd == ED_STEPS ? 2u : 1u;
+    ed_ver = (uint8_t)(bl && q[0] >= 1u && q[0] <= maxv ? q[0] : 1u);
+    if (bl < 2u || q[0] < 1u || q[0] > maxv) {
+        ed_reply(cmd, ED_BAD, op, 3);
+        return 1;
+    }
+    switch (cmd) {
+    case ED_STATE: {                     /* op 0 get; 1 subscribe (q[2]: 1 on, 0 off); 2..6 the transport */
+        uint32_t st = ED_OK;
+        if (op == 1u) {
+            ed_state_sub = bl >= 3u && q[2];
+            ed_state_ver = ed_ver;       /* (the pushes in the subscriber's version) */
+        } else if (op >= 2u && op <= 6u)
+            st = ed_transport(op, q, bl);
+        else if (op != 0u)
+            st = ED_BAD;
+        ed_reply(cmd, st, op, st == ED_BAD ? 3u : ed_state(ed_body, ed_ver));   /* (refused too: the state as it is) */
+        return 1;
+    }
+    case ED_STEPS: {                     /* op 0 read [ch, bar]; 1 write [ch, bar, n, n x 6]; 2 playhead [ch, on] */
+        uint32_t ch = bl >= 3u ? q[2] : 0xFFu, bar = bl >= 4u ? q[3] : 0xFFu;
+        int r;
+        if (ch >= NCH || (op != 2u && bl < 4u)) {
+            ed_reply(cmd, ED_BAD, op, 3);
+            return 1;
+        }
+        if (op == 2u) {
+            ed_steps_sub = bl >= 4u && q[3];
+            ed_steps_ch = (uint8_t)ch;
+            ed_steps_ver = ed_ver;
+            ed_reply(cmd, ED_OK, op, 3);
+            return 1;
+        }
+        ed_body[k++] = (uint8_t)ch;
+        ed_body[k++] = (uint8_t)bar;
+        ed_body[k++] = seq_pat(ch)->bars;
+        if (ed_ver >= 2u)                /* (version 2: DIV, the step, the time) */
+            k += ed_time(ed_body + k, seq_pat(ch));
+        else
+            ed_body[k++] = seq_pat(ch)->div;
+        if (op == 1u) {
+            uint32_t n = bl >= 5u ? q[4] : 0u;
+            if (bl < 5u + 6u * n) {
+                ed_reply(cmd, ED_BAD, op, 3);
+                return 1;
+            }
+            r = factory_busy() ? -2 : seq_bar_write(ch, bar, q + 5, n);
+            if (r) {
+                ed_reply(cmd, r == -2 ? ED_BUSY : ED_RANGE, op, k);
+                return 1;
+            }
+        } else if (op != 0u) {
+            ed_reply(cmd, ED_BAD, op, 3);
+            return 1;
+        }
+        r = seq_bar_read(ch, bar, ed_body + k + 1, (ED_MAX - k - 1u) / 6u);   /* (a write answers with the bar as it is) */
+        if (r < 0) {
+            ed_reply(cmd, ED_RANGE, op, k);
+            return 1;
+        }
+        ed_body[k] = (uint8_t)r;
+        ed_reply(cmd, ED_OK, op, k + 1u + 6u * (uint32_t)r);
+        return 1;
+    }
+    case ED_SONG:                        /* op 0 scenes; 1 a scene [s, pat x6, mute, solo, level x6]; 2 the song; 3 [n, end,
+                                          * n x (scene, bars, reps)] */
+        if (op == 0u) {
+            ed_body[k++] = NSCENE;
+            for (i = 0; i < NSCENE; i++)
+                k += ed_scene(ed_body + k, i);
+        } else if (op == 1u) {
+            if (bl < 2u + 1u + 6u + 2u + 6u || q[2] >= NSCENE) {
+                ed_reply(cmd, ED_BAD, op, 3);
+                return 1;
+            }
+            if (factory_busy()) {
+                ed_reply(cmd, ED_BUSY, op, 3);
+                return 1;
+            }
+            seq_scene_set(q[2], q + 3, q[9], q[10], q + 11);
+            ed_body[k++] = q[2];         /* (the scene as it is now) */
+            k += ed_scene(ed_body + k, q[2]);
+        } else if (op == 2u || op == 3u) {
+            if (op == 3u) {
+                uint32_t n = bl >= 3u ? q[2] : 0xFFu;
+                int r;
+                if (n > NCHAIN || bl < 4u + 3u * n) {
+                    ed_reply(cmd, ED_BAD, op, 3);
+                    return 1;
+                }
+                r = factory_busy() ? -2 : seq_chain_set(q + 4, n, q[3] & 1u);
+                if (r) {
+                    ed_reply(cmd, r == -2 ? ED_BUSY : ED_RANGE, op, 3);
+                    return 1;
+                }
+            }
+            ed_body[k++] = song.nchain;
+            ed_body[k++] = (uint8_t)seq_chain_end_stop();
+            ed_body[k++] = song.mode;
+            for (i = 0; i < song.nchain; i++) {
+                ed_body[k++] = song.chain[i].scene;
+                ed_body[k++] = song.chain[i].bars;
+                ed_body[k++] = song.chain[i].reps;
+            }
+        } else {
+            ed_reply(cmd, ED_BAD, op, 3);
+            return 1;
+        }
+        ed_reply(cmd, ED_OK, op, k);
+        return 1;
+    case ED_PRESETS:                     /* op 0 factory [engine]; 1 user [first, count]; 2 load [ch, kind, engine, index];
+                                          * 3 a kit's lanes [ch] */
+        if (op == 0u) {
+            uint32_t e = bl >= 3u ? q[2] : 0xFFu, n;
+            if (e >= synth_nengines()) {
+                ed_reply(cmd, ED_RANGE, op, 3);
+                return 1;
+            }
+            n = synth_engine_npresets(e);
+            ed_body[k++] = (uint8_t)e;
+            ed_body[k++] = (uint8_t)n;
+            for (i = 0; i < n && k + 18u < ED_MAX; i++) {   /* each: index, name 16 */
+                ed_body[k++] = (uint8_t)i;
+                ed_name(ed_body + k, synth_engine_preset(e, i), 16);
+                k += 16;
+            }
+        } else if (op == 1u) {
+            uint32_t first = bl >= 3u ? q[2] : 0u, cnt = bl >= 4u ? q[3] : 16u;
+            if (first >= 32u) {
+                ed_reply(cmd, ED_RANGE, op, 3);
+                return 1;
+            }
+            cnt = cnt > 16u ? 16u : cnt > 32u - first ? 32u - first : cnt;
+            ed_body[k++] = (uint8_t)first;
+            ed_body[k++] = (uint8_t)cnt;
+            for (i = first; i < first + cnt; i++) {   /* each: slot, used, engine, name 16 */
+                const user_t *u = user_at(i);
+                ed_body[k++] = (uint8_t)i;
+                ed_body[k++] = (uint8_t)(u != 0);
+                ed_body[k++] = (uint8_t)(u ? u->snd.engine : 0xFFu);
+                ed_name(ed_body + k, u ? user_name(i) : "", 16);
+                k += 16;
+            }
+        } else if (op == 2u) {
+            uint32_t ch = bl >= 3u ? q[2] : 0xFFu, kind = bl >= 4u ? q[3] : 0xFFu, e = bl >= 5u ? q[4] : 0xFFu;
+            uint32_t idx = bl >= 6u ? q[5] : 0xFFu;
+            if (ch >= NCH || kind > 1u) {
+                ed_reply(cmd, ED_BAD, op, 3);
+                return 1;
+            }
+            if (factory_busy()) {
+                ed_reply(cmd, ED_BUSY, op, 3);
+                return 1;
+            }
+            if (kind == 0u) {
+                if (e >= synth_nengines() || idx >= synth_engine_npresets(e)) {
+                    ed_reply(cmd, ED_RANGE, op, 3);
+                    return 1;
+                }
+                synth_engine(ch, e);
+                synth_preset(ch, idx);
+            } else if (idx >= 32u || !user_load(idx, ch)) {
+                ed_reply(cmd, ED_RANGE, op, 3);
+                return 1;
+            }
+            seq_touch();
+            ed_body[k++] = (uint8_t)ch;
+            ed_body[k++] = synth_sound(ch)->engine;
+            ed_body[k++] = synth_sound(ch)->preset;
+            ed_name(ed_body + k, synth_preset_name(ch), 16);
+            k += 16;
+        } else if (op == 3u) {           /* each lane: lane, note (the GM note it plays), name 16; not a kit: none */
+            uint32_t ch = bl >= 3u ? q[2] : 0xFFu, n;
+            if (ch >= NCH) {
+                ed_reply(cmd, ED_BAD, op, 3);
+                return 1;
+            }
+            n = synth_kit_lanes(ch);
+            ed_body[k++] = (uint8_t)ch;
+            ed_body[k++] = (uint8_t)n;
+            for (i = 0; i < n; i++) {
+                ed_body[k++] = (uint8_t)i;
+                ed_body[k++] = (uint8_t)synth_drum_note(i);
+                ed_name(ed_body + k, synth_kit_sound(i), 16);
+                k += 16;
+            }
+        } else {
+            ed_reply(cmd, ED_BAD, op, 3);
+            return 1;
+        }
+        ed_reply(cmd, ED_OK, op, k);
+        return 1;
+    default:
+        return 0;
+    }
+}
+/* the subscriptions: STATE on change (10 a second at most), the playhead's step. A push goes out only when the SysEx
+ * ring has room for it whole (never a wait in the main loop); one that can't stays owed, and the newest goes out as
+ * soon as there is room: a change is late at worst, never lost */
+static uint8_t ed_owed;                  /* bit 0 STATE, bit 1 the playhead: changed, not yet sent (expect ed_owed) */
+static int32_t ed_pushed_tr = -1;        /* (the last STATE pushed: its transport byte, for the host's checks) */
+static void ed_push(void)
+{
+    static uint32_t t, last_h, last_step = 0xFFFFFFFFu;
+    uint32_t now = plat_ms();
+    uint8_t v = ed_ver;
+    if (!ed_state_sub)
+        ed_owed &= (uint8_t)~1u;
+    if (ed_state_sub && now - t >= 100u) {
+        uint32_t n, h = 2166136261u, i;
+        ed_ver = ed_state_ver;
+        n = ed_state(ed_body, ed_state_ver);
+        for (i = 3; i < n; i++)
+            h = (h ^ ed_body[i]) * 16777619u;
+        if (h != last_h) {
+            ed_owed |= 1u;
+            if (plat_sysex_room() >= ed_wire(n) && ed_reply(ED_STATE, ED_OK, 0x80u, n) == 0) {   /* (op 0x80: pushed) */
+                last_h = h;
+                t = now;
+                ed_pushed_tr = ed_body[3];
+                ed_owed &= (uint8_t)~1u;
+            }
+        }
+    }
+    if (!ed_steps_sub)
+        ed_owed &= (uint8_t)~2u;
+    if (ed_steps_sub) {
+        int32_t pos = seq_pos(ed_steps_ch);
+        uint32_t stt = seq_step_ticks(seq_pat(ed_steps_ch));
+        uint32_t st = pos >= 0 ? (uint32_t)pos / stt : 0xFFFFu;
+        if (st != last_step) {
+            ed_owed |= 2u;
+            ed_ver = ed_steps_ver;
+            ed_body[3] = ed_steps_ch;
+            ed_body[4] = (uint8_t)(pos >= 0 ? (uint32_t)pos / TBAR : 0xFFu);
+            ed_body[5] = (uint8_t)(pos >= 0 ? (uint32_t)pos % TBAR / stt : 0xFFu);
+            if (plat_sysex_room() >= ed_wire(6) && ed_reply(ED_STEPS, ED_OK, 0x82u, 6) == 0) {   /* (op 0x82) */
+                last_step = st;
+                ed_owed &= (uint8_t)~2u;
+            }
+        }
+    }
+    ed_ver = v;
+}
+void editor_poll(void)                   /* a computer that sets the FM-1 up: HELLO-FOCUS, so an editor sends its focus */
+{
+    static uint32_t seen;
+    uint32_t s = plat_usb_session();
+    if (s && s != seen) {
+        seen = s;
+        editor_hello(0);
+    }
+    ed_push();
+}
+
 /* FACTORY RESET (SETTINGS SYSTEM, PLAY held 3 s; or the companion's "factory-reset" file): nullwave's own storage
  * erased (the songs with their scenes and names, the user presets, the FM6 bank: 0x97000..0xD9FFF), its settings and
  * preferences put back to their defaults, then a restart: the next start is a first start. Never the firmware, the
@@ -557,6 +1062,7 @@ static void sysex_poll(void)
 #define FR_LO 0x97000u
 #define FR_HI 0xDA000u
 static struct { uint8_t on; uint32_t at; } fr;
+static int factory_busy(void) { return fr.on; }   /* (the editor's writes refused meanwhile) */
 static void factory_start(void)
 {
     seq_stop();
@@ -656,6 +1162,14 @@ int app_expect(const char *what, int *got)
     }
     if (!strcmp(what, "song_mode")) {    /* 1: the song plays its order (SAVE + G#), 0 LOOP */
         *got = song.mode == MODE_SONG;
+        return 1;
+    }
+    if (!strcmp(what, "ed_owed")) {      /* the editor's pushes owed (no SysEx room yet): bit 0 STATE, bit 1 the playhead */
+        *got = ed_owed;
+        return 1;
+    }
+    if (!strcmp(what, "ed_pushed")) {    /* the last STATE pushed: its transport byte (bit 0 playing); -1 none yet */
+        *got = ed_pushed_tr;
         return 1;
     }
     if (!strcmp(what, "song_end")) {     /* the song's END: 1 STOP */
@@ -900,7 +1414,7 @@ static uint8_t pre_buf[PRESET_MAX], pre_in[PRESET_MAX];
 static uint32_t pre_n, pre_w;            /* the sound as a file (read), the bytes of a write under way (pre_in) */
 
 /* the parameters the editor sees (and a preset carries), each with its group */
-enum { PG_OSC, PG_FILTERG, PG_ENVG, PG_LFOG, PG_FXG, PG_MODG, PG_NGROUPS };
+enum { PG_OSC, PG_FILTERG, PG_ENVG, PG_LFOG, PG_FXG, PG_MODG, PG_KEYG, PG_MIDIG, PG_CLOCKG, PG_NGROUPS };
 static const struct { uint16_t id; uint8_t group; } EDP[] = {
     {SP_E0, PG_OSC}, {SP_E1, PG_OSC}, {SP_E2, PG_OSC}, {SP_E3, PG_OSC},
     {SP_E4, PG_OSC}, {SP_E5, PG_OSC}, {SP_E6, PG_OSC}, {SP_E7, PG_OSC},   /* (EDIT 2: filter on ANALOG and SUPER) */
@@ -939,6 +1453,118 @@ static int32_t wave_now(uint32_t ch)
     return e < 14u ? OTHER[e] : 0;
 }
 
+/* the FM-1's own settings (not a channel's): ids 0xF000 on, after the channel's (docs/EDITOR-PROTOCOL.md "Global
+ * parameters"), set as SEL KEY, SETTINGS MIDI and SEQ set them */
+#define GP_ROOT 0xF000u
+#define GP_SCALE 0xF001u
+#define GP_KEYS 0xF002u
+#define GP_CHORD 0xF003u
+#define GP_TRANS 0xF004u
+#define GP_OCT 0xF005u
+#define GP_MIDI 0xF010u                  /* 0xF010 .. 0xF015: channel 1..6's MIDI channel, in and out */
+#define GP_IN 0xF016u
+#define GP_OUT 0xF017u
+#define GP_SYNC 0xF020u
+#define GP_CLKOUT 0xF021u
+#define GP_LAUNCH 0xF022u
+static const uint16_t GPID[] = {GP_ROOT, GP_SCALE, GP_KEYS, GP_CHORD, GP_TRANS, GP_OCT, GP_MIDI, GP_MIDI + 1u,
+                                GP_MIDI + 2u, GP_MIDI + 3u, GP_MIDI + 4u, GP_MIDI + 5u, GP_IN, GP_OUT, GP_SYNC, GP_CLKOUT,
+                                GP_LAUNCH};
+#define NGP ((uint32_t)(sizeof GPID / sizeof GPID[0]))
+#define GP_AT (NEDP + 3u)                /* (the first global's index) */
+static const char *const GP_MCH[17] = {"OFF", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13",
+                                       "14", "15", "16"};
+static const char *const GP_INN[18] = {"NOTES", "CLOCK", "CH 1", "CH 2", "CH 3", "CH 4", "CH 5", "CH 6", "CH 7",
+                                       "CH 8", "CH 9", "CH 10", "CH 11", "CH 12", "CH 13", "CH 14", "CH 15", "CH 16"};
+static const char *const GP_OUTN[2] = {"KEYS", "SEQ"};
+static const char *const GP_SYNCN[4] = {"INT", "USB", "TRS", "BLE"};
+static const char *const GP_ONOFF[2] = {"OFF", "ON"};
+static const char *const GP_LAUNCHN[3] = {"BAR", "LOOP", "NOW"};
+static const char *const GP_MCHN[NCH] = {"MIDI CH 1", "MIDI CH 2", "MIDI CH 3", "MIDI CH 4", "MIDI CH 5", "MIDI CH 6"};
+static void gp_desc(uint32_t id, plat_param_t *p)
+{
+    const char *const *l = 0;
+    int32_t lo = 0, hi = 0, def = 0;
+    const char *nm = "", *unit = 0;
+    uint32_t g = PG_KEYG;
+    switch (id) {
+    case GP_ROOT: nm = "ROOT"; hi = 11; l = NOTE_NAME; break;
+    case GP_SCALE: nm = "SCALE"; hi = 15; l = SCALE_NAME; break;
+    case GP_KEYS: nm = "KEYS"; hi = 2; l = KEYS_NAME; break;
+    case GP_CHORD: nm = "CHORD"; hi = 5; l = CHORD_NAME; break;
+    case GP_TRANS: nm = "TRANS"; lo = -24; hi = 24; unit = "st"; break;
+    case GP_OCT: nm = "OCTAVE"; lo = -2; hi = 2; break;
+    case GP_IN: nm = "MIDI IN"; hi = 17; l = GP_INN; g = PG_MIDIG; break;
+    case GP_OUT: nm = "MIDI OUT"; hi = 1; l = GP_OUTN; g = PG_MIDIG; break;
+    case GP_SYNC: nm = "CLOCK"; hi = FM1B_BLE ? 3 : 2; l = GP_SYNCN; g = PG_CLOCKG; break;
+    case GP_CLKOUT: nm = "CLOCK OUT"; hi = 1; l = GP_ONOFF; g = PG_CLOCKG; break;
+    case GP_LAUNCH: nm = "SCENE LAUNCH"; hi = 2; l = GP_LAUNCHN; g = PG_CLOCKG; break;
+    default:                             /* GP_MIDI + channel */
+        nm = GP_MCHN[(id - GP_MIDI) % NCH]; hi = 16; l = GP_MCH; g = PG_MIDIG; def = (int32_t)(id - GP_MIDI) + 1; break;
+    }
+    p->id = (uint16_t)id;
+    p->type = l ? PLAT_PT_ENUM : PLAT_PT_NUMBER;
+    p->group = (uint8_t)g;
+    p->min = lo;
+    p->max = hi;
+    p->def = def;
+    p->name = nm;
+    p->unit = unit;
+    p->labels = l;
+}
+static int32_t gp_get(uint32_t id)
+{
+    switch (id) {
+    case GP_ROOT: return song.root;
+    case GP_SCALE: return song.scale;
+    case GP_KEYS: return song.keys;
+    case GP_CHORD: return song.chord;
+    case GP_TRANS: return song.transpose;
+    case GP_OCT: return set.octave;
+    case GP_IN: return prefs.in_mode;
+    case GP_OUT: return seq_cfg.seq_out;
+    case GP_SYNC: return seq_cfg.sync;
+    case GP_CLKOUT: return seq_cfg.clock_out;
+    case GP_LAUNCH: return seq_cfg.launch;
+    default: return prefs.midi_ch[(id - GP_MIDI) % NCH];
+    }
+}
+static void gp_set(uint32_t id, int32_t v)   /* (v within the range) */
+{
+    switch (id) {
+    case GP_ROOT: case GP_SCALE: case GP_KEYS: case GP_CHORD: case GP_TRANS:
+        keys_let_go();                   /* (the notes the keys hold end, as the knobs do) */
+        if (id == GP_ROOT) song.root = (uint8_t)v;
+        else if (id == GP_SCALE) song.scale = (uint8_t)v;
+        else if (id == GP_KEYS) song.keys = (uint8_t)v;
+        else if (id == GP_CHORD) song.chord = (uint8_t)v;
+        else song.transpose = (int8_t)v;
+        dirty();
+        return;
+    case GP_OCT:
+        if (v != set.octave) {
+            keys_let_go();
+            set.octave = (int8_t)v;
+            app_mark();
+        }
+        return;
+    case GP_IN: prefs.in_mode = (uint8_t)v; break;
+    case GP_OUT: seq_cfg.seq_out = (uint8_t)v; break;
+    case GP_SYNC: seq_cfg.sync = (uint8_t)v; break;
+    case GP_CLKOUT: seq_cfg.clock_out = (uint8_t)v; break;
+    case GP_LAUNCH: seq_cfg.launch = (uint8_t)v; break;
+    default: {                           /* two channels never share a MIDI channel: one taken is refused */
+        uint32_t c = (id - GP_MIDI) % NCH, i;
+        for (i = 0; i < NCH && v; i++)
+            if (i != c && prefs.midi_ch[i] == v)
+                return;
+        prefs.midi_ch[c] = (uint8_t)v;
+        break;
+    }
+    }
+    app_mark();
+}
+
 int app_param(uint32_t i, plat_param_t *p)
 {
     uint32_t ch = set.channel;
@@ -967,12 +1593,16 @@ int app_param(uint32_t i, plat_param_t *p)
         p->labels = WAVE_NAMES; p->flags = PLAT_PA_READONLY; return 0;
     case 2: p->id = EDP_SHAPE; p->type = PLAT_PT_NUMBER; p->group = PG_OSC; p->max = 127; p->def = 64; p->name = "SHAPE NOW";
         p->flags = PLAT_PA_READONLY; return 0;
-    default: return -1;
+    default:
+        if (i - GP_AT >= NGP)
+            return -1;
+        gp_desc(GPID[i - GP_AT], p);
+        return 0;
     }
 }
 const char *app_param_group(uint32_t g)
 {
-    static const char *const G[PG_NGROUPS] = {"osc", "filter", "env", "lfo", "fx", "mod"};
+    static const char *const G[PG_NGROUPS] = {"osc", "filter", "env", "lfo", "fx", "mod", "key", "midi", "clock"};
     return g < PG_NGROUPS ? G[g] : 0;
 }
 int32_t app_param_get(uint32_t i)
@@ -984,7 +1614,7 @@ int32_t app_param_get(uint32_t i)
     case 0: return synth_sound(ch)->engine;
     case 1: return wave_now(ch);
     case 2: return clamp(synth_param(ch, SP_E3) + (synth_mod_now(ch, MT_SHP) >> 9), 0, 127);
-    default: return 0;
+    default: return i - GP_AT < NGP ? gp_get(GPID[i - GP_AT]) : 0;
     }
 }
 int32_t app_param_set(uint32_t i, int32_t v)
@@ -996,6 +1626,10 @@ int32_t app_param_set(uint32_t i, int32_t v)
     } else if (i == NEDP) {
         synth_engine(ch, (uint32_t)clamp(v, 0, 13));
         seq_touch();
+    } else if (i - GP_AT < NGP) {
+        plat_param_t p;
+        gp_desc(GPID[i - GP_AT], &p);
+        gp_set(GPID[i - GP_AT], clamp(v, p.min, p.max));
     }
     return app_param_get(i);
 }

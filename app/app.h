@@ -44,14 +44,20 @@ int app_file_begin(uint32_t i, uint32_t size);
 int app_file_write(uint32_t i, uint32_t off, const uint8_t *src, uint32_t n);
 int app_file_commit(uint32_t i, uint32_t size, uint32_t crc);
 int app_file_delete(uint32_t i);
-#define APP_COMPANION_EXTRAS "editor=nullwave/1"
+#define APP_COMPANION_EXTRAS "editor=nullwave/3;editor_cmds=70:2,71:2,72:1,73:1,74:1,75:1,76:1"   /* 3: the views 0x70..0x73
+                                         * with the follow 0x74..0x76, each command:its version (docs/EDITOR-PROTOCOL.md) */
+#define APP_USB_CMD                      /* app_usb_cmd: 0x74 FOCUS from the editor (the update's framing) */
+void app_usb_cmd(const uint8_t *d, uint32_t n);
+#define APP_SYSEX                        /* app_sysex: the same frames as the host simulator hands them; and
+                                          * plat_sysex_send for 0x75 NAV, 0x76 HELLO-FOCUS */
+int app_sysex(const uint8_t *p, uint32_t n);
 #define APP_UPDATE_BEGIN                 /* app_update_begin: an install begins, nullwave stops and says so */
 int app_update_begin(void);
 #define APP_RESTART                      /* plat_restart: after a factory reset */
 #define APP_BOOT                         /* app_boot: HOME held at power-on, the settings to their defaults (songs kept) */
 void app_boot(void);
 #define APP_PARAMS
-#define APP_PARAM_MAX 64
+#define APP_PARAM_MAX 80                /* (57 the channel's, 17 the FM-1's own: room for more) */
 int app_param(uint32_t i, plat_param_t *p);
 const char *app_param_group(uint32_t g);
 int32_t app_param_get(uint32_t i);

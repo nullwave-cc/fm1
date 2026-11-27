@@ -1,0 +1,24 @@
+# The editor's pushes (docs/EDITOR-PROTOCOL.md 0x70 STATE, 0x71 playhead) when the computer stops reading: a push
+# that finds no room in the SysEx ring (a state's frame is 196 bytes, the playhead's 17) is owed, never dropped, and
+# the newest goes out once the computer reads again.
+# Run by tests/run_tests.sh:
+#   app/build/host/nullwave_host app/tests/editor_push.txt app/build/host
+wait 1800
+# STATE subscribe, the playhead of channel 1 on
+sysex F0 00 32 41 1B 00 00 40 00 01 02 70 07 F7
+sysex F0 00 32 45 23 00 00 40 00 02 00 04 58 0F F7
+wait 300
+expect ed_owed 0
+usb stall
+tap PLAY
+wait 2500
+expect ed_owed 3
+expect ed_pushed 1
+tap PLAY
+wait 400
+expect ed_owed 3
+expect ed_pushed 1
+usb read
+wait 300
+expect ed_owed 0
+expect ed_pushed 0

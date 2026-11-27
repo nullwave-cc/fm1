@@ -747,6 +747,103 @@ void seq_song_rec(int on)
     seq_touch();
 }
 
+/* the editor's STEPS (docs/EDITOR-PROTOCOL.md 0x71): one bar of a channel's pattern, each note 6 bytes: its step at
+ * the pattern's DIV, its offset from that step (ticks, i8), the note, the velocity, the length (6 ticks a unit; DRONE
+ * a flag) and its flags (EV_RATCH, EV_FILL, EV_NOFILL, EV_DRONE). The parameter locks are not notes: kept as they are */
+#define BAR_FL (EV_RATCH | EV_FILL | EV_NOFILL | EV_DRONE)
+int seq_bar_read(uint32_t ch, uint32_t bar, uint8_t *out, uint32_t max)   /* the notes written (-1: no such bar) */
+{
+    const pat_t *p = seq_pat(ch % NCH);
+    uint32_t i, n = 0, st = seq_step_ticks(p), b0 = bar * TBAR, f;
+    if (bar >= p->bars)
+        return -1;
+    f = lock_();
+    for (i = 0; i < p->n && n < max; i++) {
+        const ev_t *e = &p->ev[i];
+        uint32_t in;
+        int32_t step, off;
+        if ((e->fl & EV_LOCK) || e->pos < b0 || e->pos >= b0 + TBAR)
+            continue;
+        in = e->pos - b0;
+        step = (int32_t)((in + st / 2u) / st);
+        off = (int32_t)in - step * (int32_t)st;
+        out[6 * n] = (uint8_t)step;
+        out[6 * n + 1] = (uint8_t)(int8_t)off;
+        out[6 * n + 2] = e->note;
+        out[6 * n + 3] = e->vel;
+        out[6 * n + 4] = e->len;
+        out[6 * n + 5] = (uint8_t)(e->fl & BAR_FL);
+        n++;
+    }
+    unlock_(f);
+    return (int)n;
+}
+int seq_bar_write(uint32_t ch, uint32_t bar, const uint8_t *in, uint32_t n)   /* the bar's notes replaced: 0, -1 out of
+                                                                               * range, -2 busy (recording it) */
+{
+    pat_t *p;
+    uint32_t i, st, b0 = bar * TBAR, f;
+    ch %= NCH;
+    p = seq_pat(ch);
+    if (bar >= p->bars)
+        return -1;
+    if ((rec == REC_ON || rec == REC_COUNT || rec == REC_TAKE) && rec_ch == ch)
+        return -2;
+    st = seq_step_ticks(p);
+    for (i = 0; i < n; i++) {            /* (all in the bar, or nothing changes) */
+        int32_t pos = (int32_t)(in[6 * i] * st) + (int8_t)in[6 * i + 1];
+        if (pos < 0 || pos >= (int32_t)TBAR || in[6 * i + 2] > 127u || in[6 * i + 3] == 0u || in[6 * i + 3] > 127u)
+            return -1;
+    }
+    undo_take(ch);                       /* (EDIT + OCT- undoes it, as a recording) */
+    f = lock_();
+    for (i = 0; i < p->n;)
+        if (!(p->ev[i].fl & EV_LOCK) && p->ev[i].pos >= b0 && p->ev[i].pos < b0 + TBAR)
+            ev_del(p, i);
+        else
+            i++;
+    for (i = 0; i < n; i++)
+        ev_add(p, b0 + (uint32_t)((int32_t)(in[6 * i] * st) + (int8_t)in[6 * i + 1]), in[6 * i + 2], in[6 * i + 3],
+               in[6 * i + 4] ? in[6 * i + 4] : 1u, in[6 * i + 5] & BAR_FL);
+    seq_drones_off((int32_t)ch);         /* (its drones struck again from the bar as it is now) */
+    unlock_(f);
+    seq_touch();
+    return 0;
+}
+void seq_scene_set(uint32_t s, const uint8_t *pat, uint32_t mute, uint32_t solo, const uint8_t *level)
+{
+    uint32_t f = lock_(), ch;
+    scene_t *sc = &song.scene[s % NSCENE];
+    for (ch = 0; ch < NCH; ch++) {
+        sc->pat[ch] = (uint8_t)(pat[ch] % NPAT);
+        sc->level[ch] = (uint8_t)(level[ch] > 127u ? 127u : level[ch]);
+    }
+    sc->mute = (uint8_t)(mute & 0x3Fu);
+    sc->solo = (uint8_t)(solo & 0x3Fu);
+    unlock_(f);
+    seq_touch();
+}
+int seq_chain_set(const uint8_t *sec, uint32_t n, int end_stop)   /* the song's order replaced: 0, -2 busy (SONG REC) */
+{
+    uint32_t f, i;
+    if (song_rec || n > NCHAIN)
+        return song_rec ? -2 : -1;
+    f = lock_();
+    for (i = 0; i < n; i++) {
+        song.chain[i].scene = (uint8_t)(sec[3 * i] % NSCENE);
+        song.chain[i].bars = (uint8_t)(sec[3 * i + 1] > 64u ? 64u : sec[3 * i + 1]);
+        song.chain[i].reps = (uint8_t)(sec[3 * i + 2] < 1u ? 1u : sec[3 * i + 2] > 16u ? 16u : sec[3 * i + 2]);
+        song.chain[i].rsv = 0;
+    }
+    song.nchain = (uint8_t)n;
+    song.chain[0].rsv = (uint8_t)(end_stop ? 1u : 0u);
+    if (sect_i >= song.nchain)
+        sect_i = 0;
+    unlock_(f);
+    seq_touch();
+    return 0;
+}
+
 /* the CHAIN page's keys: the song's order typed in, a scene a key (its own length in bars), deleted, its END */
 static uint32_t scene_len(uint32_t s);
 uint32_t seq_scene_bars(uint32_t s) { return scene_len(s % NSCENE) / TBAR; }

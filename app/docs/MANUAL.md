@@ -222,7 +222,7 @@ nowhere else.
 | AUDIO | SPEAKER LOWCUT | USB AUDIO MASTER / FULL | FILTER RESO | |
 | SEQ | STEP ADVANCE | DRUM PREVIEW | SCENE LAUNCH (BAR, LOOP, NOW) | REC MODE (OVERDUB / REPLACE) |
 | SYSTEM | VERSION | AUTOSAVE | CPU | BATTERY (%, USB or CHARGING) |
-| SYSTEM 2 | FACTORY RESET (turn it, then hold PLAY 3 s) | | | |
+| SYSTEM 2 | FACTORY RESET (turn it, then hold PLAY 3 s) | EDITOR (turn it: the editor's page, below) | | |
 | MIDI 1/4 | CHANNEL 1 | CHANNEL 2 | CHANNEL 3 | CHANNEL 4 |
 | MIDI 2/4 | CHANNEL 5 | CHANNEL 6 | MIDI IN (NOTES, CLOCK, CH n) | OTHER CH (SEL / OFF) |
 | MIDI 3/4 | MIDI OUT (KEYS / SEQ) | BEND RANGE (1–12) | DRUM MAP (GM / 1-16) | FX CHANNEL |
@@ -453,6 +453,32 @@ notes and the key; in LOOP, a channel playing a chord shows its name in place of
   for a fifth (`C5`).
 - Names are spelled in the song's key: in F, `Bb` (not A#); in D, `F#m`. With no key, the usual names: C# Eb F# Ab Bb.
 
+## ◆ The editor's page
+
+With the [nullwave editor](https://nullwave.cc/fm1/editor/) open on a computer and the FM-1 connected by USB, the editor chooses what the FM-1's knobs
+set. It sends the FM-1 the parameters it shows (up to eight) and its page's title. The FM-1 opens its **EDITOR**
+page and puts the first four on KNOB 1–4, with their names and values in the footer and all of them above. The keys
+play the channel the editor shows.
+
+| Control | On the EDITOR page |
+|---|---|
+| KNOB 1–4 | the four parameters (the editor sees each turn) |
+| SELECT | the next four; past the last, the editor turns its own page |
+| ALGORITHM | the channel (the editor follows) |
+| PRESETS | the editor's next or previous sound |
+| SAVE (tap) | the editor saves |
+| SAVE + a scene key | the scene launches, and the editor is told |
+| HOME | leaves the page (the editor is told) |
+
+Everywhere else the buttons and knobs do what they always do. SETTINGS → SYSTEM 2 → EDITOR (turn KNOB 2) opens the page
+from the FM-1 and asks the editor for its parameters; it also asks each time a computer connects.
+
+The editor also sees and changes the rest of the FM-1, on any page: PLAY and STOP, REC, the tempo, launching a scene,
+LOOP or SONG, a bar's notes, the scenes and the song's order, the presets, and the settings of SEL KEY (ROOT, SCALE,
+KEYS, CHORD, TRANS, the octave), MIDI (each channel's MIDI channel, MIDI IN, MIDI OUT) and the clock (CLOCK, CLOCK OUT,
+SCENE LAUNCH). The FM-1's own rules hold: a scene launched while playing starts at SCENE LAUNCH's point, the tempo
+follows an outside clock while CLOCK is not INT, and a bar being recorded can't be rewritten from the computer.
+
 ## Saving, autosave and backup
 
 **Songs.** Eight songs, A–H, each in its own slot. SAVE → SONG: turn SONG to pick a slot, LOAD (twice) to open it,
@@ -547,4 +573,4 @@ keeps the whole FM-1. Putting a song file back from the computer is not there ye
 
 ## Not yet
 
-User samples and the web editor; putting a backup back from the computer; more kits; ties and slides on steps.
+User samples; putting a backup back from the computer; more kits; ties and slides on steps.

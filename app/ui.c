@@ -20,7 +20,7 @@ enum { PG_HOME, PG_ENV, PG_FX, PG_FILTER, PG_DELAY, PG_REVERB, PG_KEY, PG_KEY2, 
        PG_ENVDEST, PG_LFO, PG_LFO2, PG_LFODEST, PG_SLICER, PG_INSERT, PG_INSERT2, PG_AFILTER, PG_VOICE2,
        PG_FM_OP, PG_FM_ENV, PG_FM_OP2, PG_LANES, PG_LANES2, PG_ARP, PG_ARP2, PG_TEXTURE, PG_TEXTURE2,
        PG_PRESETS, PG_USER, PG_TOOLS, PG_M_AUDIO, PG_M_SEQ, PG_NOTES, PG_DGRID, PG_PITCH,
-       PG_NAME, PG_M_SCREEN2, PG_ENV2, PG_MOD1, PG_MOD2, PG_MOD3, PG_MOD4, PG_M_SYSTEM2, NPG };   /* ENV 2, the mod slots */   /* NAME: SHIFT + SAVE, the channel's name */                        /* HOME held: the menu */
+       PG_NAME, PG_M_SCREEN2, PG_ENV2, PG_MOD1, PG_MOD2, PG_MOD3, PG_MOD4, PG_M_SYSTEM2, PG_EDITOR, NPG };   /* ENV 2, the mod slots */   /* NAME: SHIFT + SAVE, the channel's name */                        /* HOME held: the menu */
 /* the page groups that are no button's own: nullwave's settings, the menu */
 enum { G_CONF = NB, G_MENU, NGROUP };
 
@@ -52,7 +52,7 @@ enum {
     KN_LOWCUT, KN_USBA, KN_RESO, KN_STEPADV, KN_DRPREV, KN_RREPL,
     KN_NSEL, KN_NPITCH, KN_NMOVE, KN_NLEN, KN_DLANE, KN_DSTEP, KN_DHIT, KN_DVEL,
     KN_NMCUR, KN_NMCHR, KN_NMPRE, KN_NMCLR,
-    KN_HOMEVIEW, KN_AUTOLOOP, KN_FACTORY, KN_BATT,             /* SETTINGS SCREEN 2: MAIN's view at power-on; REC shows LOOP */   /* NAME: the cursor, its character, a ready name, clear */
+    KN_HOMEVIEW, KN_AUTOLOOP, KN_FACTORY, KN_BATT, KN_ED0, KN_ED1, KN_ED2, KN_ED3, KN_EDENTER,             /* SETTINGS SCREEN 2: MAIN's view at power-on; REC shows LOOP */   /* NAME: the cursor, its character, a ready name, clear */
     KN_N
 };
 
@@ -63,7 +63,7 @@ static const char *const PAGE_TITLE[NPG] = {"MAIN", "ENV", "FX", "FILTER", "DELA
                                             "ENV DEST", "LFO", "LFO 2", "LFO DEST", "SLICER", "INSERT", "INSERT 2",
                                             "FILTER", "VOICE 2", "OPERATOR", "OP ENV", "OPERATOR 2", "LANES",
                                             "LANES 2", "ARP", "ARP 2", "TEXTURE", "TEXTURE 2", "PRESETS", "USER",
-                                            "TOOLS", "AUDIO", "SEQ", "NOTES", "DRUMS", "PITCH", "NAME", "SCREEN 2", "ENV 2", "MOD 1", "MOD 2", "MOD 3", "MOD 4", "SYSTEM 2"};
+                                            "TOOLS", "AUDIO", "SEQ", "NOTES", "DRUMS", "PITCH", "NAME", "SCREEN 2", "ENV 2", "MOD 1", "MOD 2", "MOD 3", "MOD 4", "SYSTEM 2", "EDITOR"};
 static const uint16_t PAGE_KN[NPG][4] = {
     [PG_HOME] = {KN_SWING, KN_LEVEL, KN_BARS, KN_SP + SP_PAN},
     [PG_ENV] = {KN_SP + SP_ATK, KN_SP + SP_DEC, KN_SP + SP_SUS, KN_SP + SP_REL},
@@ -125,7 +125,8 @@ static const uint16_t PAGE_KN[NPG][4] = {
     [PG_M_SCREEN] = {KN_DISPLAY, KN_ACCEL, KN_GRAPHS, KN_NONE},
     [PG_M_LIGHTS] = {KN_LIGHTS, KN_SCALEKEYS, KN_NONE, KN_NONE},
     [PG_M_SYSTEM] = {KN_ABOUT, KN_AUTOSAVE, KN_CPU, KN_BATT},
-    [PG_M_SYSTEM2] = {KN_FACTORY, KN_NONE, KN_NONE, KN_NONE},
+    [PG_M_SYSTEM2] = {KN_FACTORY, KN_EDENTER, KN_NONE, KN_NONE},
+    [PG_EDITOR] = {KN_ED0, KN_ED1, KN_ED2, KN_ED3},
     [PG_SONG] = {KN_SLOT, KN_LOAD, KN_SAVE, KN_NEW},
     [PG_SCENE] = {KN_SCN, KN_SCN_CH, KN_SCN_PAT, KN_SCN_SND},
     [PG_CHAIN] = {KN_CS, KN_CS_SCENE, KN_CS_BARS, KN_CS_REPS},
@@ -684,8 +685,98 @@ static void name_close(int keep)         /* SAVE again: kept (all spaces: none);
     app_say(t, keep ? chan_name(ch) : "NAME AS IT WAS");
 }
 
+/* ------------------------------------------------- the editor's page --- */
+/* EDITOR (docs/EDITOR-PROTOCOL.md 0x74 FOCUS): the parameters a computer's editor shows, four on the knobs at a time
+ * (SELECT the next four; past the last, the editor told: NAV PAGE), set as the editor's own sets them (app_param_set:
+ * the companion's watch reports them). The keys play the focused channel */
+static struct {
+    uint8_t on, ch, n, pg;
+    char title[17];
+    uint16_t ids[8];
+} ed;
+void editor_nav(uint32_t ev, int32_t arg);
+void editor_hello(uint32_t reason);
+static void go_home(void);
+static int32_t accel(int32_t e);
+static int ed_param(uint32_t k, plat_param_t *p, uint32_t *idx)   /* the parameter on knob k now: 1 there */
+{
+    uint32_t j = ed.pg * 4u + k, i;
+    if (!ed.on || j >= ed.n)
+        return 0;
+    for (i = 0; app_param(i, p) == 0; i++)
+        if (p->id == ed.ids[j]) {
+            *idx = i;
+            return 1;
+        }
+    return 0;
+}
+static int ed_value(uint32_t k, char *out, int32_t *v, int32_t *lo, int32_t *hi)
+{
+    plat_param_t p;
+    uint32_t i;
+    if (!ed_param(k, &p, &i)) {
+        copy_text(out, "-", 8);
+        return 0;
+    }
+    *v = app_param_get(i);
+    *lo = p.min;
+    *hi = p.max;
+    if (p.type == PLAT_PT_ENUM && p.labels && *v >= p.min && *v <= p.max)
+        copy_text(out, p.labels[*v - p.min], 8);
+    else
+        int_text(*v, out);
+    return 1;
+}
+static void ed_turn(uint32_t k, int32_t e)
+{
+    plat_param_t p;
+    uint32_t i;
+    if (ed_param(k, &p, &i) && !(p.flags & PLAT_PA_READONLY))
+        app_param_set(i, clamp(app_param_get(i) + (p.type == PLAT_PT_ENUM ? (e > 0 ? 1 : -1) : accel(e)), p.min, p.max));
+}
+static const char *ed_label(uint32_t k)
+{
+    plat_param_t p;
+    uint32_t i;
+    return ed_param(k, &p, &i) ? p.name : "";
+}
+static void editor_open(int from_device)   /* the EDITOR page (from SETTINGS: the editor asked for its focus again) */
+{
+    ui.page = PG_EDITOR;
+    ui.group_btn = B_HOME;
+    ui.layer = -1;
+    ui.layer_lock = 0;
+    if (from_device)
+        editor_hello(1);
+}
+/* 0x74 FOCUS: the channel, a title, the parameters (none: the focus cleared) */
+void ui_editor_focus(uint32_t ch, const char *title, uint32_t tlen, const uint16_t *ids, uint32_t n)
+{
+    uint32_t i;
+    if (!n) {
+        ed.on = 0;
+        ed.n = 0;
+        if (ui.page == PG_EDITOR)
+            go_home();
+        return;
+    }
+    ed.on = 1;
+    ed.ch = (uint8_t)(ch % NCH);
+    ed.n = (uint8_t)(n > 8u ? 8u : n);
+    ed.pg = 0;
+    for (i = 0; i < 16u && i < tlen && title[i]; i++)
+        ed.title[i] = title[i] >= 'a' && title[i] <= 'z' ? (char)(title[i] - 32) : title[i];
+    ed.title[i] = 0;
+    for (i = 0; i < ed.n; i++)
+        ed.ids[i] = ids[i];
+    set.channel = ed.ch;                 /* (the keys play the channel the editor shows) */
+    editor_open(0);
+}
+
 static const char *kn_label(uint32_t id)
 {
+    if (id >= KN_ED0 && id <= KN_ED3)
+        return ed_label(id - KN_ED0);
     static const char *const L[] = {
         [KN_SWING] = "SWING", [KN_LEVEL] = "LEVEL", [KN_BARS] = "BARS", [KN_DIV] = "DIV", [KN_PATIDX] = "PATTERN",
         [KN_BPM] = "BPM", [KN_CLICK] = "CLICK", [KN_LAUNCH] = "LAUNCH", [KN_MODE] = "PLAY", [KN_ROOT] = "ROOT",
@@ -710,7 +801,7 @@ static const char *kn_label(uint32_t id)
         [KN_PRE_SOUND] = "SOUND", [KN_PRE_ENGINE] = "ENGINE", [KN_PRE_FAV] = "FAV", [KN_USLOT] = "SLOT",
         [KN_ULOAD] = "LOAD", [KN_UERASE] = "ERASE", [KN_USAVE] = "SAVE", [KN_CLRSQ] = "CLRSQ", [KN_INIT] = "INIT",
         [KN_NMCUR] = "CURSOR", [KN_NMCHR] = "CHAR", [KN_NMPRE] = "NAME", [KN_NMCLR] = "CLEAR",
-        [KN_HOMEVIEW] = "HOME", [KN_AUTOLOOP] = "AUTOLP", [KN_FACTORY] = "RESET", [KN_BATT] = "BATTERY",
+        [KN_HOMEVIEW] = "HOME", [KN_AUTOLOOP] = "AUTOLP", [KN_FACTORY] = "RESET", [KN_BATT] = "BATTERY", [KN_EDENTER] = "EDITOR",
         [KN_LOWCUT] = "LOWCUT", [KN_USBA] = "USB", [KN_RESO] = "RESO", [KN_STEPADV] = "ADVANCE", [KN_NSEL] = "NOTE#", [KN_NPITCH] = "PITCH",
         [KN_NMOVE] = "MOVE", [KN_NLEN] = "LENGTH", [KN_DLANE] = "LANE", [KN_DSTEP] = "STEP", [KN_DHIT] = "HIT",
         [KN_DVEL] = "VEL",
@@ -917,6 +1008,11 @@ static uint32_t kn_value(uint32_t id, char *out)
         case KN_HOMEVIEW: v = prefs.home_view; copy_text(out, v ? "LOOP" : "PLAY", 8); break;
         case KN_AUTOLOOP: v = !prefs.loop_manual; on_off(v, out); break;
         case KN_FACTORY: copy_text(out, ui.fr_arm ? "PLAY 3S" : "TURN", 8); return 0;
+        case KN_EDENTER: copy_text(out, "OPEN", 8); return 0;
+        case KN_ED0: case KN_ED1: case KN_ED2: case KN_ED3:
+            if (!ed_value(id - KN_ED0, out, &v, &lo, &hi))
+                return 0;
+            break;
         case KN_BATT: batt_text(out); return 0;
         case KN_LIGHTS: {
             static const char *const L3[3] = {"OFF", "LOW", "HIGH"};
@@ -1465,6 +1561,12 @@ static void kn_turn(uint32_t id, int32_t e)
     case KN_GRAPHS: prefs.graphs = s > 0; prefs.graph_set = 0; app_mark(); break;   /* (every page to the default) */
     case KN_HOMEVIEW: prefs.home_view = s > 0; ui.loop = prefs.home_view; ui.loop_auto = 0; app_mark(); break;
     case KN_AUTOLOOP: prefs.loop_manual = s < 0; app_mark(); break;
+    case KN_EDENTER:                     /* SETTINGS > SYSTEM 2 > EDITOR: the page the editor fills, the editor told */
+        editor_open(1);
+        break;
+    case KN_ED0: case KN_ED1: case KN_ED2: case KN_ED3:
+        ed_turn(id - KN_ED0, e);
+        break;
     case KN_FACTORY:                     /* armed for 10 s: PLAY held 3 s erases everything nullwave keeps */
         ui.fr_arm = plat_ms() | 1u;
         app_say("ERASES ALL SONGS", "HOLD PLAY 3 S");
@@ -1719,6 +1821,8 @@ static int group_pages(void)
 
 static void go_home(void)
 {
+    if (ui.page == PG_EDITOR)
+        editor_nav(6, 0);                /* (NAV EXIT: the editor knows the FM-1 left its page) */
     ui.page = PG_HOME;
     ui.group_btn = B_HOME;
     ui.layer = -1;
@@ -1969,6 +2073,8 @@ static void layer_key(uint32_t k, int down)
                 app_say("COPIED TO", s);
             } else if (ui.save_keys++ == 0) {
                 seq_launch((uint32_t)w);
+                if (ui.page == PG_EDITOR)
+                    editor_nav(5, w);    /* (EDITOR: the editor told, NAV SCENE n) */
                 app_say("SCENE", s);
             } else {
                 seq_qchain_add((uint32_t)w);
@@ -2896,7 +3002,10 @@ static void button_up(uint32_t k, uint32_t now)
         ui.copy_mode = 0;
     }
     if (has_layer(k) && !ui.used[k] && !ui.layer_used && held < TAP_MS) {   /* a tap: the pages */
-        if (k == B_SAVE && ui.page == PG_SONG)
+        if (k == B_SAVE && ui.page == PG_EDITOR) {
+            editor_nav(4, 0);            /* EDITOR: SAVE tapped, the editor saves (NAV SAVE) */
+            app_say("EDITOR", "SAVE");
+        } else if (k == B_SAVE && ui.page == PG_SONG)
             do_save(seq_slot());             /* SAVE on the SONG page: the song saved (twice: AGAIN) */
         else if (k == B_SAVE && ui.group_btn != B_SAVE) {
             slot_pick = (uint8_t)seq_slot();  /* SAVE elsewhere: the SONG page */
@@ -3016,6 +3125,25 @@ static void encoders_input(void)
         }
         if (ui.page == PG_NAME && k < EN_K1)   /* NAME: the channel and its sound stay, SELECT waits */
             continue;
+        if (ui.page == PG_EDITOR && k < EN_K1) {   /* EDITOR: SELECT its pages (past the ends: the editor's), ALGORITHM
+                                          * the channel and PRESETS the editor's sounds, both told */
+            int32_t s = e > 0 ? 1 : -1;
+            if (k == EN_SELECT) {
+                int32_t np = (ed.n + 3) / 4;
+                if (ed.pg + s >= 0 && ed.pg + s < np)
+                    ed.pg = (uint8_t)(ed.pg + s);
+                else
+                    editor_nav(2, s);
+            } else if (k == EN_ALGO) {
+                set.channel = (uint8_t)(((int32_t)set.channel + s + NCH) % NCH);
+                app_mark();
+                editor_nav(1, s);
+                say_sound();
+            } else {
+                editor_nav(3, s);
+            }
+            continue;
+        }
         if (k == EN_SELECT) {
             if (ui.page != PG_HOME && group_pages() > 1)
                 page_turn(e);
@@ -3675,6 +3803,7 @@ static const char *set_label(uint32_t id)   /* a setting's name in full, as the 
     case KN_HOMEVIEW: return "HOME VIEW";
     case KN_AUTOLOOP: return "AUTO LOOP";
     case KN_FACTORY: return "FACTORY RESET";
+    case KN_EDENTER: return "EDITOR";
     case KN_BATT: return "BATTERY";
     case KN_AUTOSAVE: return "AUTOSAVE";
     case KN_ABOUT: return "VERSION";
@@ -3777,6 +3906,8 @@ static void draw_foot(uint32_t now)
         title = seq_cfg.rec_replace ? "REC REPLACE" : "REC OVERDUB";
     else if (ui.page == PG_EDIT1 || ui.page == PG_EDIT2 || (ui.page == PG_HOME && !ui.loop))
         title = synth_page_title(ch, ui.page == PG_EDIT2);
+    else if (ui.page == PG_EDITOR && ed.on && ed.title[0])
+        title = ed.title;                /* (EDITOR: the editor's own title) */
     else if (ui.page == PG_HOME && silent_why(ch))   /* LOOP: why the channel is silent, where the title is */
         title = silent_why(ch);
     else if (ui.page == PG_HOME && ui.loop && song.mode == MODE_SONG && song.nchain && seq_playing()) {
@@ -4000,6 +4131,51 @@ static void draw_chain(uint32_t band)
     cv_blit(0, 26 + 84 * band);
 }
 
+/* EDITOR: what the editor shows on the computer, its parameters and their values, the four on the knobs lit */
+static void draw_editor(uint32_t band)
+{
+    uint32_t i;
+    char t[24];
+    cv_begin(240, 84, TC(BG));
+    cv_oy = -84 * (int32_t)band;
+    cv_y0 = 0;
+    cv_y1 = 84;
+    if (!ed.on) {
+        cv_text(12, 40, &FONT_B, "EDITOR", TC(FG));
+        cv_text(12, 70, &FONT_T, "OPEN THE NULLWAVE EDITOR", TC(SUB));
+        cv_text(12, 86, &FONT_T, "ON THE COMPUTER: IT CHOOSES", TC(SUB));
+        cv_text(12, 102, &FONT_T, "WHAT THE KNOBS SET HERE", TC(SUB));
+    } else {
+        text_fit(12, 8, &FONT_M, ed.title[0] ? ed.title : "EDITOR", TC(FG), 160);
+        channel_text(ed.ch, t);
+        text_fit(12, 36, &FONT_T, t, th.ch[ed.ch % NCH], 120);
+        if (ed.n > 4u) {
+            char pg[8];
+            int_text(ed.pg + 1, pg);
+            text_cat(pg, "/");
+            int_text((int32_t)(ed.n + 3u) / 4, pg + 2);
+            cv_text(228 - text_w(&FONT_T, pg), 36, &FONT_T, pg, TC(SUB));
+        }
+        for (i = 0; i < ed.n; i++) {     /* (two columns of four; the knobs' four lit) */
+            int32_t x = 12 + 112 * (int32_t)(i / 4u), y = 60 + 24 * (int32_t)(i % 4u);
+            int lit = i / 4u == ed.pg;
+            uint32_t pgs = ed.pg;
+            char v[12];
+            ed.pg = (uint8_t)(i / 4u);   /* (the value as the knob would show it) */
+            {
+                int32_t vv = 0, lo = 0, hi = 1;
+                if (!ed_value(i % 4u, v, &vv, &lo, &hi))
+                    copy_text(v, "-", 12);
+            }
+            text_fit(x, y, &FONT_T, ed_label(i % 4u), lit ? TC(SUB) : TC(DIM), 60);
+            ed.pg = (uint8_t)pgs;
+            text_fit(x + 62, y - 2, &FONT_B, v, lit ? TC(FG) : TC(DIM), 44);
+        }
+    }
+    cv_oy = 0;
+    cv_blit(0, 26 + 84 * band);
+}
+
 /* NAME: the channel, its eight places (the cursor's in its colour, blinking), what the buttons do */
 static void draw_name(uint32_t band, uint32_t blink)
 {
@@ -4047,6 +4223,8 @@ static void draw_(uint32_t now)
         mode = 9u + GR_N;                /* NAME: the name being edited */
     else if (mode == 0u && ui.page == PG_CHAIN)
         mode = 11u + GR_N;               /* CHAIN: the song's order */
+    else if (mode == 0u && ui.page == PG_EDITOR)
+        mode = 12u + GR_N;               /* EDITOR: the editor's parameters */
     else if (mode == 0u && !ui.loop)
         mode = 10u + GR_N;               /* the channels as PLAY (0: as LOOP) */
     if (ui.theme_drawn != prefs.display || mode != ui.mode_drawn) {   /* another theme or view: everything again */
@@ -4103,6 +4281,22 @@ static void draw_(uint32_t now)
             anim_step(ch, now);          /* (the frame's sound and dots once, then each band) */
             for (k = 0; k < 2u; k++)
                 draw_play_anim(k, now);
+        }
+    } else if (mode == 12u + GR_N) {
+        h = sig_str(sig_add(2166136261u, (uint32_t)ed.on << 24 | (uint32_t)ed.n << 16 | ed.pg << 8 | ed.ch), ed.title);
+        for (i = 0; i < ed.n; i++) {
+            uint32_t pgs = ed.pg;
+            char v[12];
+            int32_t vv = 0, lo = 0, hi = 1;
+            ed.pg = (uint8_t)(i / 4u);
+            ed_value(i % 4u, v, &vv, &lo, &hi);
+            ed.pg = (uint8_t)pgs;
+            h = sig_add(sig_str(h, v), ed.ids[i]);
+        }
+        if (h != ui.sig_row[0]) {
+            ui.sig_row[0] = h;
+            for (i = 0; i < 2u; i++)
+                draw_editor(i);
         }
     } else if (mode == 11u + GR_N) {
         h = sig_add(2166136261u, song.nchain << 16 | ui.cs << 8 | (uint32_t)seq_chain_end_stop());
@@ -4236,9 +4430,11 @@ void app_ui_init(void)
 
 static int factory_step(void);
 static void factory_start(void);
+void editor_poll(void);
 void app_frame(void)
 {
     uint32_t i, now = plat_ms();
+    editor_poll();
     if (factory_step())                  /* (a factory reset under way: nothing else, the ring filling) */
         return;
     {                                    /* a note left on: a voice held whose key is up, nothing else holding it (the

@@ -4,6 +4,11 @@ nullwave.cc is the nullwave-cc/site repository. Its FM-1 product page is `fm1/in
 the shared pieces: `/style.css`, `/device.js` and `/assets/` (logos, fonts, the FM-1's screens). This repository makes
 four folders of `/fm1/`: the installer, the emulator, the quick start and the manual.
 
+A release does all of this with one command, `python3 tools/release.py VERSION`
+([RELEASING.md](RELEASING.md)): it builds the pages, publishes them into the site's `fm1/` with the editor, commits
+that to the site's **main** (signed) and pushes it, with no pull request. What follows is what it runs, for building
+or checking the pages by hand.
+
 ## 1. Build the pages
 
 ```bash
@@ -30,9 +35,11 @@ It prints the screens the pages show. They are the site's `/assets/screens/` (th
 
 ## 2. Into the site
 
-On a branch of nullwave-cc/site, commit only those four folders (and the screens, if any changed, as their own
-change), then open a pull request for the site's review. `fm1/index.html`, `style.css`, `device.js` and the rest of
-the site stay as they are.
+`tools/release.py` commits what it wrote in the site (the four folders, `fm1/editor/` and `fm1/versions.json`) to the
+site's main in one signed commit and pushes it; `--include PATH ...` adds the site's own tracked files that changed
+with it (`index.html`, `404.html`, `sitemap.xml`, `fm1/index.html`), and any other tracked change stops it. `fm1/index.html`, `style.css`,
+`device.js` and the rest of the site are otherwise left as they are. Screens that are new or changed go into the
+site's `assets/screens/` (the list `publish_site.py` prints) before the release, as their own change.
 
 A version tag (`vX.Y.Z`) also runs [release.yml](../.github/workflows/release.yml): a **draft** GitHub release with
-the package, to be published by hand.
+the package. `tools/release.py` checks that its package is the site's (SHA-256) and then publishes it.

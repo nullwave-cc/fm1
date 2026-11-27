@@ -281,14 +281,15 @@ def nav(base, here):
 
 
 def footer(base):
-    """the site's footer, as its FM-1 page has it (the copy: assets/web/footer.html), its assets under BASE and the
-    emulator beside the installer"""
+    """the site's footer, as its FM-1 page has it (the copy: assets/web/footer.html, with the editor's link), its assets
+    under BASE and the emulator beside the installer"""
     html = (VENDOR / "footer.html").read_text(encoding="utf-8").strip()
     html = html.replace('"/assets/', f'"{base}assets/').replace(' srcset="/assets/', f' srcset="{base}assets/')
     html = html.replace(f'<li><a href="{base}manual/">Quick start</a></li><li><a href="{base}guide/">Guide</a></li>',
                         f'<li><a href="{base}quick-start/">Quick start</a></li><li><a href="{base}manual/">Manual</a></li>')
-    html = html.replace(f'<li><a href="{base}installer/">Installer</a></li>',
-                        f'<li><a href="{base}installer/">Installer</a></li><li><a href="{base}emulator/">Emulator</a></li>', 1)
+    if f'href="{base}emulator/"' not in html:   # (the site's footer lists it already: not twice)
+        html = html.replace(f'<li><a href="{base}installer/">Installer</a></li>',
+                            f'<li><a href="{base}installer/">Installer</a></li><li><a href="{base}emulator/">Emulator</a></li>', 1)
     return "<!--nw:foot-->" + html + "<!--/nw:foot-->"
 
 

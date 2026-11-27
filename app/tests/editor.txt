@@ -1,0 +1,33 @@
+# The editor's page (docs/EDITOR-PROTOCOL.md): SETTINGS > SYSTEM 2 > EDITOR opens it and tells the editor (0x76
+# HELLO-FOCUS, reason 1); 0x74 FOCUS fills it, the knobs set its parameters; HOME leaves it (0x75 NAV EXIT). Run by
+# tests/run_tests.sh:
+#   app/build/host/nullwave_host app/tests/editor.txt app/build/host
+wait 1800
+press HOME
+wait 900
+release HOME
+wait 50
+turn SELECT 6
+wait 30
+expect page 64
+turn K2 1
+wait 30
+expect page 65
+expect_sysex F0 00 32 59 1B 00 00 40 00 00 02 74 07 F7
+# FOCUS: channel 1, "Bass", two parameters (EDIT 1's first two)
+sysex F0 00 32 51 63 00 00 40 00 00 08 08 0A 36 6E 1C 01 04 00 14 00 60 0C F7
+expect_sysex F0 00 32 51 0B 00 00 00 00 7F 01 F7
+wait 30
+expect page 65
+expect channel 0
+turn K2 3
+wait 30
+shot editor.png
+tap HOME
+wait 30
+expect page 0
+expect_sysex F0 00 32 55 13 00 00 00 03 00 72 03 F7
+# FOCUS cleared
+sysex F0 00 32 51 23 00 00 40 00 00 00 00 70 0F F7
+wait 30
+expect page 0

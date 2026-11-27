@@ -155,6 +155,10 @@ void seq_chain_delete(uint32_t pos);
 int seq_chain_end_stop(void);            /* the song's END: 1 stop after the last section, 0 round again */
 void seq_chain_set_end_stop(int on);
 uint32_t seq_sect(void);                 /* the section playing (song mode) */
+int seq_bar_read(uint32_t ch, uint32_t bar, uint8_t *out, uint32_t max);   /* the editor's STEPS: 6 bytes a note */
+int seq_bar_write(uint32_t ch, uint32_t bar, const uint8_t *in, uint32_t n);
+void seq_scene_set(uint32_t s, const uint8_t *pat, uint32_t mute, uint32_t solo, const uint8_t *level);
+int seq_chain_set(const uint8_t *sec, uint32_t n, int end_stop);
 uint32_t seq_qchain_len(void);
 int seq_scene_used(uint32_t scene);
 void seq_scene_copy(uint32_t from, uint32_t to);

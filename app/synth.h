@@ -99,6 +99,8 @@ uint32_t synth_nengines(void);
 uint32_t synth_npresets(uint32_t ch);
 const char *synth_engine_name(uint32_t engine);
 const char *synth_preset_name(uint32_t ch);
+uint32_t synth_engine_npresets(uint32_t engine);
+const char *synth_engine_preset(uint32_t engine, uint32_t i);
 #define SYN_NAME 16                      /* a user preset's name, at most */
 void synth_set_name(uint32_t ch, const char *nm, uint32_t len);
 const char *synth_own_name(uint32_t ch);       /* the name synth_set_name gave, "" none */
@@ -114,6 +116,7 @@ int synth_lane_mute(uint32_t ch, uint32_t lane);   /* DRUM: a lane muted or back
 uint32_t synth_lane_mutes(uint32_t ch);
 const char *synth_kit_sound(uint32_t i);   /* DRUM: lane i's name (0..7) */
 uint32_t synth_drum_note(uint32_t lane);   /* DRUM: lane's GM note */
+uint32_t synth_kit_lanes(uint32_t ch);    /* the channel's kit lanes: 8 on DRUM, else 0 */
 int32_t synth_key_note(uint32_t ch, uint32_t k);   /* the note key k plays if the engine maps the keys, else -1 */
 
 /* the parameters: SP_* */

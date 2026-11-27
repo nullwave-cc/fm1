@@ -46,6 +46,61 @@ def preset(engine, values, flags=1, slot=0, name=b"TEST"):
     return b
 
 
+def frames(link, cmd):
+    """the frames of cmd the device sent since (0x75 NAV, 0x76 HELLO-FOCUS): their bodies"""
+    link.run(50)
+    out, keep = [], []
+    for pk in link.q:
+        a = C.decode(pk)
+        (out if a and a[0] == cmd else keep).append(a[1] if a and a[0] == cmd else pk)
+    link.q[:] = keep
+    return out
+
+
+def focus(c, ch, title, ids):
+    body = bytes([1, ch, len(title)]) + title + bytes([len(ids)]) + b"".join(struct.pack("<H", i) for i in ids)
+    return c.request(0x74, body)
+
+
+def editor_focus(link, c):
+    """0x74 FOCUS, 0x75 NAV, 0x76 HELLO-FOCUS (docs/EDITOR-PROTOCOL.md, editor=nullwave/3). In --serve the encoders
+    are turned by role: 0 SELECT, 1 ALGORITHM, 2 PRESETS, 3..6 KNOB 1..4"""
+    page = lambda: " ".join(link.cmd("expect page -1"))
+    # channel 2, five parameters: DTN (E1), CUT, ENV 2 ATK, the engine, the waveform (read only)
+    ids = [SP["SP_E1"], SP["SP_CUT"], SP["SP_E2_ATK"], 1000, 1001]
+    check("FOCUS taken", focus(c, 1, b"Lead", ids) == b"\x00")
+    check("the EDITOR page is open", "got 65" in page())
+    check("the keys play the focused channel", "got 1" in " ".join(link.cmd("expect channel -1")))
+    c.set(SP["SP_E1"], 0)
+    link.cmd("turn 3 5")
+    link.run(100)
+    check("KNOB 1 sets the first parameter", c.get([SP["SP_E1"]]).get(SP["SP_E1"], 0) > 0)
+    link.cmd("turn 0 1")
+    link.run(50)
+    w = c.get([1001]).get(1001)
+    link.cmd("turn 3 2")
+    link.run(50)
+    check("SELECT: the next four (KNOB 1 the waveform, read only: unchanged)", c.get([1001]).get(1001) == w)
+    frames(link, 0x75)
+    link.cmd("turn 0 1")
+    check("SELECT past the last page: NAV PAGE +1", bytes([2, 1]) in frames(link, 0x75))
+    link.cmd("turn 2 -1")
+    check("PRESETS: NAV PRESET -1", bytes([3, 0xFF]) in frames(link, 0x75))
+    link.cmd("turn 1 1")
+    check("ALGORITHM: NAV CH +1", bytes([1, 1]) in frames(link, 0x75))
+    check("a bad channel is refused", focus(c, 9, b"X", [1]) == b"\x01")
+    check("more than 8 parameters is refused", focus(c, 1, b"X", list(range(9))) == b"\x01")
+    check("an empty list clears the focus", focus(c, 1, b"", []) == b"\x00")
+    check("cleared: the EDITOR page left", "got 0" in page())
+    focus(c, 1, b"Lead", ids)
+    frames(link, 0x75)
+    link.cmd("buttons " + str(1 << 6))   # (HOME down, then up: a tap)
+    link.run(60)
+    link.cmd("buttons 0")
+    link.run(60)
+    check("HOME leaves EDITOR: NAV EXIT", bytes([6, 0]) in frames(link, 0x75) and "got 0" in page())
+
+
 def main():
     sp_ids()
     host = ROOT / "app" / "build" / "host" / "nullwave_host"
@@ -54,7 +109,9 @@ def main():
         link.run(1800)
         c = C.Client(link)
         hi = c.hello()
-        check("the capability query names the editor", hi["extras"].get("editor") == "nullwave/1")
+        check("the capability query names the editor, version 3", hi["extras"].get("editor") == "nullwave/3")
+        check("and lists its commands 0x70..0x76 with their versions",
+              hi["extras"].get("editor_cmds") == "70:2,71:2,72:1,73:1,74:1,75:1,76:1")
         params = c.params()
         groups = {p["group"] for p in params}
         check("the parameters carry their groups", {"osc", "filter", "env", "lfo", "fx", "mod"} <= groups)
@@ -90,6 +147,7 @@ def main():
             check("a file that is not a preset is refused", False)
         except C.CompanionError:
             check("a file that is not a preset is refused", True)
+        editor_focus(link, c)
     finally:
         link.close()
     print(f"editor_test: {len(fails)} failed")

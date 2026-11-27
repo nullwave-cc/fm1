@@ -380,6 +380,11 @@ void synth_preset(uint32_t ch, uint32_t preset)
 uint32_t synth_nengines(void) { return NENG; }
 uint32_t synth_npresets(uint32_t ch) { return ENGINES[snd[ch % NCH].engine]->npresets; }
 const char *synth_engine_name(uint32_t engine) { return ENGINES[engine % NENG]->name; }
+uint32_t synth_engine_npresets(uint32_t engine) { return ENGINES[engine % NENG]->npresets; }
+const char *synth_engine_preset(uint32_t engine, uint32_t i)   /* an engine's factory sound i's name (0: none) */
+{
+    return i < ENGINES[engine % NENG]->npresets ? ENGINES[engine % NENG]->presets[i].name : 0;
+}
 const char *synth_preset_name(uint32_t ch)
 {
     const sound_t *s = &snd[ch % NCH];
@@ -409,6 +414,7 @@ const char *synth_page_title(uint32_t ch, uint32_t page) { return ENGINES[snd[ch
 int synth_is_kit(uint32_t ch) { return ENGINES[snd[ch % NCH].engine]->oneshot; }
 const char *synth_kit_sound(uint32_t i) { return DRUM_LANE[i % DL_N]; }
 uint32_t synth_drum_note(uint32_t lane) { return DRUM_GM[lane % DL_N]; }
+uint32_t synth_kit_lanes(uint32_t ch) { return snd[ch % NCH].engine == E_DRUM ? DL_N : 0u; }
 /* the note key k (0 = F3) plays when the engine maps the keys itself (DRUM, SLICE), else -1 */
 int32_t synth_key_note(uint32_t ch, uint32_t k)
 {
