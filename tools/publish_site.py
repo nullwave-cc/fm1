@@ -98,6 +98,82 @@ def installer_subs(html):
     return html
 
 
+# The installer's wait for an FM-1 after an update (fm1-base web/fm1ota.js, inlined into the page): an FM-1 that comes
+# back under a new USB identity (a serial number it did not have) is a new device to the computer, and some browsers
+# list it only in a new MIDIAccess. Patched here, as published, until fm1-base has it: the wait asks the browser for its
+# ports again every 5 s, waits 60 s, and says what to do. Each piece must match the count given, or the publish stops:
+# the patch never silently stops applying when the code it targets changes upstream.
+RECONNECT_MARK = "/* nw:reconnect */"
+RECONNECT = [
+    ("""  async waitFor(filter, ms) {
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      const dev = await this.find(filter);
+      if (dev) return dev;
+      await sleep(1000);
+    }
+    return null;
+  }""", """  async waitFor(filter, ms) { """ + RECONNECT_MARK + """
+    const end = Date.now() + ms;
+    let fresh = Date.now() + 5000;
+    while (Date.now() < end) {
+      const dev = await this.find(filter);
+      if (dev) return dev;
+      await sleep(1000);
+      if (Date.now() >= fresh) {             // (a device back under a new USB identity is a new device to the computer:
+        fresh = Date.now() + 5000;            // some browsers list it only in a new MIDIAccess)
+        await this.refresh();
+      }
+    }
+    return null;
+  }
+
+  // the browser's MIDI ports asked again (the permission is already given: no prompt)
+  async refresh() {
+    try {
+      if (typeof navigator !== "undefined" && navigator.requestMIDIAccess)
+        this.access = await navigator.requestMIDIAccess({ sysex: true });
+    } catch (_) { /* (the ports as they were) */ }
+  }""", 1),
+    (r"this\.waitFor\(\(id\) => !IS_OTA\(id\)([^)]*), 40000\)", r"this.waitFor((id) => !IS_OTA(id)\1, 60000)", 5),
+    ('"the device did not come back: power-cycle it"',
+     '"the FM-1 did not answer after the update. If its screen shows nullwave, it is installed: reload this page to '
+     'check. Otherwise power-cycle it"', 5),
+    ('noreturn: "The FM-1 did not come back. Power-cycle it."',
+     'noreturn: "The FM-1 did not answer after the update. If its screen shows nullwave, it is installed: reload this '
+     'page to check. Otherwise power-cycle it."', 1),
+    ('noreturn: "FM-1 が戻ってきません。電源を入れ直してください。"',
+     'noreturn: "アップデート後、FM-1 が応答しませんでした。画面に nullwave と表示されていればインストールは完了しています。'
+     'このページを再読み込みして確認してください。そうでなければ電源を入れ直してください。"', 1),
+]
+
+
+def _patch(text, pieces, first=0):
+    for i, (old, new, n) in enumerate(pieces, first):
+        if i == 1:
+            got = len(re.findall(old, text))
+            text = re.sub(old, new, text)
+        else:
+            got = text.count(old)
+            text = text.replace(old, new)
+        if got != n:
+            sys.exit(f"publish_site: the installer's reconnect patch, piece {i + 1}: found {got} time(s), not {n}. "
+                     "fm1-base's web/fm1ota.js or installer.html changed: look at RECONNECT (tools/publish_site.py)")
+    return text
+
+
+def reconnect_js(js):
+    """the reconnect patch's code (the first three pieces) on fm1ota.js's text, alone (tests/installer_reconnect_test.py)"""
+    return _patch(js, RECONNECT[:3])
+
+
+def installer_reconnect(html):
+    """the reconnect patch on a page that has the installer's Updater (else the page as it is)"""
+    if "class Updater" not in html:
+        return html
+    return _patch(html, RECONNECT)
+
+
 def rewrite(html, page):
     html = re.sub(r"<title>[^<]*</title>", f"<title>{TITLES[page]}</title>", html, count=1)
     for a, b in SHARED.items():
@@ -109,7 +185,7 @@ def rewrite(html, page):
     html = html.replace("/fm1/assets/fm1-docs.css", "fm1-docs.css").replace("/fm1/assets/fm1-docs.js", "fm1-docs.js")
     if page == "installer":              # (the companion's scripts beside it)
         html = html.replace('"../companion/', '"./companion/')
-        html = installer_subs(html)
+        html = installer_subs(installer_reconnect(html))
     if page == "emulator":
         html = html.replace("../fonts/", "./fonts/").replace("../words/", "./words/")
     return html
@@ -215,6 +291,8 @@ def main():
                 elif (BUILT / "firmware" / fw).exists():
                     shutil.copyfile(BUILT / "firmware" / fw, dst / "firmware" / fw)
                     html = html.replace("../firmware/" + fw, "firmware/" + fw)
+            if RECONNECT_MARK not in html:
+                sys.exit("publish_site: the installer's reconnect patch is not in installer/index.html")
             sha = hashlib.sha256((dst / "firmware" / pkg).read_bytes()).hexdigest()[:12] if not fw_url else ""
             if sha:                              # (the package by its content: an update of the same version reloads)
                 html = html.replace("firmware/" + pkg, f"firmware/{pkg}?v={sha}")

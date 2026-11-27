@@ -16,6 +16,8 @@ echo "== the editor's views (0x70..0x73)"
 python3 tests/editor_views_test.py
 echo "== the names a computer sees (USB, Bluetooth)"
 python3 tests/device_names_test.py
+echo "== the installer finds an FM-1 back from an update on a new device"
+python3 tests/installer_reconnect_test.py
 echo "== the factory reset over the companion (the installer's way)"
 python3 tests/factory_test.py
 echo "== the chord names (app/chords.c)"
