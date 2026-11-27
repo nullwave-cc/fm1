@@ -1,8 +1,10 @@
 # nullwave's build settings (tools/build.py)
 name = "nullwave"              # APP_NAME is in app.h; this names the build's files
 id_prefix = "FM-1_60"          # package identity (each firmware its own): dev FM-1_6000, releases FM-1_60XXYYZZ
-usb_manufacturer = "nullwave"
-usb_product = "nullwave"
+usb_manufacturer = "nullwave"   # the USB names: the computer lists "FM-1" by nullwave (its MIDI device and port)
+usb_product = "FM-1"
+usb_serial = true              # a serial number from the chip's ID: a computer knows this FM-1 whichever port it is in,
+                               # and does not keep a name from another firmware on that port
 font_full = ["L", "M", "B", "T"]   # lower case in the big fonts (the name) and in B and T (chord names: Cm, Bb, m3)
 o2 = ["synth.c"]               # separate units compiled at -O2 (an app's DSP): the engines' host
 include = ["../engines/felucca/src"]   # Felucca's engines (MIT), built into synth.c

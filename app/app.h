@@ -44,6 +44,11 @@ int app_file_begin(uint32_t i, uint32_t size);
 int app_file_write(uint32_t i, uint32_t off, const uint8_t *src, uint32_t n);
 int app_file_commit(uint32_t i, uint32_t size, uint32_t crc);
 int app_file_delete(uint32_t i);
+/* the Bluetooth MIDI name, advertised and the GAP Device Name (fm1-base bt/ble/ble_cfg.h, its defaults overridden here):
+ * "nullwave FM-1 XXXX", XXXX the last four hex digits of the address, so two FM-1s are told apart (at most 24 characters
+ * before XXXX; another FM-1 scanning keeps 16 of a name: "nullwave FM-1 A1") */
+#define BLE_DEVICE_NAME "nullwave FM-1"
+#define BLE_NAME_SEP " "
 #define APP_COMPANION_EXTRAS "editor=nullwave/3;editor_cmds=70:2,71:2,72:1,73:1,74:1,75:1,76:1"   /* 3: the views 0x70..0x73
                                          * with the follow 0x74..0x76, each command:its version (docs/EDITOR-PROTOCOL.md) */
 #define APP_USB_CMD                      /* app_usb_cmd: 0x74 FOCUS from the editor (the update's framing) */

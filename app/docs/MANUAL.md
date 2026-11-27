@@ -366,7 +366,9 @@ sustain (CC 64), program change (the engine's preset; on DRUM, 0–8 the kit), C
 72 REL, 73 ATK, 74 CUT, 75 DEC, 91 REV, 93 CHO, 94 DLY, 121 reset. **MIDI LEARN:** GLO + D4, turn a knob, send a CC (8
 kept). FX CH: notes 36–62 on that channel hold the punch-ins. REMOTE: CC 102–115 press the buttons. Clock: SYNC
 follows USB, TRS or BLE; a lost clock (0.5 s) keeps its tempo. CLOCK sends clock over USB, also while stopped.
-Bluetooth MIDI: SETTINGS → BLUETOOTH. The MIDI settings are in SETTINGS → MIDI.
+Bluetooth MIDI: SETTINGS → BLUETOOTH. The MIDI settings are in SETTINGS → MIDI. Over USB a computer lists the
+FM-1 as **FM-1** by nullwave; over Bluetooth it is **nullwave FM-1** and four characters of its own (nullwave FM-1 A1B2),
+so two FM-1s are told apart.
 
 ![Steps](img/screen-steps.png)
 ![Playing](img/screen-playing.png)
@@ -527,6 +529,9 @@ keeps the whole FM-1. Putting a song file back from the computer is not there ye
   and PHYS 3); a further note takes the oldest one's place.
 - **A setting seems stuck.** Settings are saved by themselves when the FM-1 is quiet; give it two seconds after a
   change before switching off.
+- **A computer shows an old name for the FM-1** (a name from an earlier firmware). macOS keeps the name a
+  device had when it was first plugged in. Open Audio MIDI Setup (Window → Show MIDI Studio), delete the greyed-out
+  (offline) devices of that name, and plug the FM-1 in again: it shows as FM-1.
 - **Something is badly wrong.** Hold REC while switching on and reinstall, or go back to stock (Installing, above).
 
 ## Cheat sheet
