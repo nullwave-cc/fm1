@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2
+
+- Over USB the FM-1 now shows as "FM-1" by nullwave, with a serial number of its own (from its chip), so a computer
+  sets it up under this name whichever port it is in, and tells two FM-1s apart.
+- Over Bluetooth it shows as "nullwave FM-1" and four characters of its own (nullwave FM-1 A1B2).
+- The manual says what a computer lists, and how to clear an old name in Audio MIDI Setup on a Mac.
+
 ## 0.1.1
 
 The nullwave editor (nullwave.cc/fm1/editor/) now works with the FM-1 over USB.
