@@ -1,0 +1,7 @@
+{
+  "what": "A six-channel groovebox. Each channel is a synth or a drum kit, with a sequencer of 1 to 8 bar patterns, loop recording, scenes you launch live, songs, and scales on the keys. Bluetooth MIDI and a web editor.",
+  "author": "nullwave",
+  "kinds": ["groove", "synth", "drums"],
+  "editor": "https://nullwave.cc/fm1/editor/",
+  "sounds": "CC0: Versilian Studios VSCO-2 CE and VCSL (piano, flute, tenor sax); the drum break is synthesised"
+}
